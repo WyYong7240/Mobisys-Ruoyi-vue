@@ -29,35 +29,95 @@
                 </template>
 
                 <div v-if="currentDevice">
-
-                  <el-descriptions title="操作系统基础信息" :column="3" border>
-                    <el-descriptions-item label="设备编号">{{ currentDevice.deviceNo }}</el-descriptions-item>
-                    <el-descriptions-item label="设备名称">{{ currentDevice.name }}</el-descriptions-item>
-                    <el-descriptions-item label="设备类型">{{ currentDevice.type }}</el-descriptions-item>
-                    <el-descriptions-item label="状态">
-                      <el-tag :type="currentDevice.status === '在线' ? 'success' : 'danger'">{{ currentDevice.status }}</el-tag>
-                    </el-descriptions-item>
-                  </el-descriptions>
-
-                  <el-row :gutter="16" style="margin-top: 20px;">
-                    <el-col :span="6">
-                      <el-card shadow="hover">
-                        <template #header>实时 CPU 使用率</template>
-                        <div class="metric-value" style="font-size: 24px; font-weight: bold; color: #409EFF;">
-                          {{ metrics.cpuUsage }}%
+                  <el-row :gutter="10">
+                    <el-col :span="12" class="card-box">
+                      <el-card>
+                        <template #header>
+                          <Cpu style="width: 1em; height: 1em; vertical-align: middle;" /> 
+                          <span style="vertical-align: middle;">CPU</span>
+                        </template>
+                        <div class="el-table el-table--enable-row-hover el-table--medium">
+                          <table cellspacing="0" style="width: 100%;">
+                            <thead>
+                              <tr>
+                                <th class="el-table__cell is-leaf"><div class="cell">属性</div></th>
+                                <th class="el-table__cell is-leaf"><div class="cell">值</div></th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr>
+                                <td class="el-table__cell is-leaf"><div class="cell">总使用率</div></td>
+                                <td class="el-table__cell is-leaf"><div class="cell">{{ metrics.cpuUsage }}%</div></td>
+                              </tr>
+                              <tr>
+                                <td class="el-table__cell is-leaf"><div class="cell">当前空闲率</div></td>
+                                <td class="el-table__cell is-leaf"><div class="cell">{{ metrics.cpuFree }}%</div></td>
+                              </tr>
+                            </tbody>
+                          </table>
                         </div>
                       </el-card>
                     </el-col>
-                    <el-col :span="6">
-                      <el-card shadow="hover">
-                        <template #header>实时 内存使用率</template>
-                        <div class="metric-value" style="font-size: 24px; font-weight: bold; color: #67C23A;">
-                          {{ metrics.memUsage }}%
+
+                    <el-col :span="12" class="card-box">
+                      <el-card>
+                        <template #header>
+                          <Tickets style="width: 1em; height: 1em; vertical-align: middle;" /> 
+                          <span style="vertical-align: middle;">内存</span>
+                        </template>
+                        <div class="el-table el-table--enable-row-hover el-table--medium">
+                          <table cellspacing="0" style="width: 100%;">
+                            <thead>
+                              <tr>
+                                <th class="el-table__cell is-leaf"><div class="cell">属性</div></th>
+                                <th class="el-table__cell is-leaf"><div class="cell">值</div></th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr>
+                                <td class="el-table__cell is-leaf"><div class="cell">总内存</div></td>
+                                <td class="el-table__cell is-leaf"><div class="cell">{{ metrics.memTotalGb }} G</div></td>
+                              </tr>
+                              <tr>
+                                <td class="el-table__cell is-leaf"><div class="cell">已用内存</div></td>
+                                <td class="el-table__cell is-leaf"><div class="cell">{{ metrics.memUsedGb }} G</div></td>
+                              </tr>
+                              <tr>
+                                <td class="el-table__cell is-leaf"><div class="cell">剩余内存</div></td>
+                                <td class="el-table__cell is-leaf"><div class="cell">{{ metrics.memFreeGb }} G</div></td>
+                              </tr>
+                              <tr>
+                                <td class="el-table__cell is-leaf"><div class="cell">使用率</div></td>
+                                <td class="el-table__cell is-leaf">
+                                  <div class="cell" :class="{'text-danger': metrics.memUsage > 80}">
+                                    {{ metrics.memUsage }}%
+                                  </div>
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
                         </div>
                       </el-card>
                     </el-col>
                   </el-row>
 
+                  <!-- Grafana 面板嵌入 -->
+                  <!-- <el-row :gutter="15" style="margin-top: 20px;">
+                    <el-col :span="12" v-for="panel in panelList" :key="panel.id">
+                      <div class="grafana-container" style="border: 1px solid #ebeef5; border-radius: 4px; overflow: hidden;">
+                        <div class="panel-title" style="padding: 5px 10px; background: #f8f9fb; font-size: 12px; color: #606266; border-bottom: 1px solid #ebeef5;">
+                          {{ panel.name }}
+                        </div>
+                        <iframe
+                          :src="getGrafanaUrl(panel.id)"
+                          width="100%"
+                          height="250"
+                          frameborder="0"
+                          scrolling="no">
+                        </iframe>
+                      </div>
+                    </el-col>
+                  </el-row> -->
                 </div>
                 <el-empty v-else description="请从左侧选择设备" />
               </el-card>

@@ -2,7 +2,8 @@ import { defineConfig, loadEnv } from 'vite'
 import path from 'path'
 import createVitePlugins from './vite/plugins'
 
-const baseUrl = 'http://localhost:30811' // 后端接口
+const baseUrl = 'http://localhost:30812' // 后端接口
+const promUrl = 'http://192.168.31.34:30090' // Prometheus接口
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode, command }) => {
@@ -42,10 +43,15 @@ export default defineConfig(({ mode, command }) => {
     },
     // vite 相关配置
     server: {
-      port: 30081,
+      port: 30011,
       host: true,
       open: true,
       proxy: {
+        '/dev-api/prom-api': {
+          target: promUrl,
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/dev-api\/prom-api/, '')
+        },
         // https://cn.vitejs.dev/config/#server-proxy
         '/dev-api': {
           target: baseUrl,
@@ -56,7 +62,15 @@ export default defineConfig(({ mode, command }) => {
          '^/v3/api-docs/(.*)': {
           target: baseUrl,
           changeOrigin: true,
+        },
+        '/api': {
+        target: 'http://192.168.31.34:32556', // 目标 Grafana 地址
+        changeOrigin: true,                // 允许跨域
+        ws: true,
+        pathRewrite: {
+          '^/api': '/api'                  // 保持路径不变
         }
+      },
       }
     },
     css: {
