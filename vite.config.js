@@ -3,7 +3,7 @@ import path from 'path'
 import createVitePlugins from './vite/plugins'
 
 const baseUrl = 'http://localhost:30812' // 后端接口
-const promUrl = 'http://192.168.31.34:30090' // Prometheus接口
+const promUrl = 'http://192.168.31.34:30092' // Prometheus接口
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode, command }) => {

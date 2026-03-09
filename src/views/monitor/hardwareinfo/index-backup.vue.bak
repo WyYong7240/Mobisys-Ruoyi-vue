@@ -24,100 +24,51 @@
               <el-card shadow="hover" class="main-content">
                 <template #header>
                   <span>节点设备硬件基础信息与时序指标数据监控</span>
-                  <br>
-                  <span>{{ currentDevice?.name || '请选择设备' }}</span>
                 </template>
 
                 <div v-if="currentDevice">
-                  <el-row :gutter="10">
-                    <el-col :span="12" class="card-box">
-                      <el-card>
-                        <template #header>
-                          <Cpu style="width: 1em; height: 1em; vertical-align: middle;" /> 
-                          <span style="vertical-align: middle;">CPU</span>
-                        </template>
-                        <div class="el-table el-table--enable-row-hover el-table--medium">
-                          <table cellspacing="0" style="width: 100%;">
-                            <thead>
-                              <tr>
-                                <th class="el-table__cell is-leaf"><div class="cell">属性</div></th>
-                                <th class="el-table__cell is-leaf"><div class="cell">值</div></th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              <tr>
-                                <td class="el-table__cell is-leaf"><div class="cell">总使用率</div></td>
-                                <td class="el-table__cell is-leaf"><div class="cell">{{ metrics.cpuUsage }}%</div></td>
-                              </tr>
-                              <tr>
-                                <td class="el-table__cell is-leaf"><div class="cell">当前空闲率</div></td>
-                                <td class="el-table__cell is-leaf"><div class="cell">{{ metrics.cpuFree }}%</div></td>
-                              </tr>
-                            </tbody>
-                          </table>
+
+                  <el-descriptions title="硬件平台基础信息" :column="3" border>
+                    <el-descriptions-item label="设备编号">{{ currentDevice.deviceNo }}</el-descriptions-item>
+                    <el-descriptions-item label="设备名称">{{ currentDevice.name }}</el-descriptions-item>
+                    <el-descriptions-item label="设备类型">{{ currentDevice.type }}</el-descriptions-item>
+                    <el-descriptions-item label="状态">
+                      <el-tag :type="currentDevice.status === '在线' ? 'success' : 'danger'">{{ currentDevice.status }}</el-tag>
+                    </el-descriptions-item>
+
+                    <el-descriptions-item label="CPU 型号" :span="2">{{ hardwareDetail.cpu.model }}</el-descriptions-item>
+                    <el-descriptions-item label="架构">{{ hardwareDetail.cpu.arch }}</el-descriptions-item>
+                    <el-descriptions-item label="核心/线程">{{ hardwareDetail.cpu.cores }}C / {{ hardwareDetail.cpu.threads }}T</el-descriptions-item>
+                    <el-descriptions-item label="主频">{{ hardwareDetail.cpu.freq }}</el-descriptions-item>
+                    <el-descriptions-item label="厂商">{{ hardwareDetail.cpu.vendor }}</el-descriptions-item>
+                                  
+                    <el-descriptions-item label="物理插槽数">{{ hardwareDetail.memory.totalSlots }}</el-descriptions-item>
+                    <el-descriptions-item label="已插内存条" :span="2">
+                      <el-tag v-for="slot in hardwareDetail.memory.slots" :key="slot.slot" size="small" style="margin-right: 5px;">
+                        {{ slot.slot }}: {{ slot.size }} ({{ slot.type }})
+                      </el-tag>
+                    </el-descriptions-item>
+                  </el-descriptions>
+
+                  <el-row :gutter="16" style="margin-top: 20px;">
+                    <el-col :span="6">
+                      <el-card shadow="hover">
+                        <template #header>实时 CPU 使用率</template>
+                        <div class="metric-value" style="font-size: 24px; font-weight: bold; color: #409EFF;">
+                          {{ metrics.cpuUsage }}%
                         </div>
                       </el-card>
                     </el-col>
-
-                    <el-col :span="12" class="card-box">
-                      <el-card>
-                        <template #header>
-                          <Tickets style="width: 1em; height: 1em; vertical-align: middle;" /> 
-                          <span style="vertical-align: middle;">内存</span>
-                        </template>
-                        <div class="el-table el-table--enable-row-hover el-table--medium">
-                          <table cellspacing="0" style="width: 100%;">
-                            <thead>
-                              <tr>
-                                <th class="el-table__cell is-leaf"><div class="cell">属性</div></th>
-                                <th class="el-table__cell is-leaf"><div class="cell">值</div></th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              <tr>
-                                <td class="el-table__cell is-leaf"><div class="cell">总内存</div></td>
-                                <td class="el-table__cell is-leaf"><div class="cell">{{ metrics.memTotalGb }} G</div></td>
-                              </tr>
-                              <tr>
-                                <td class="el-table__cell is-leaf"><div class="cell">已用内存</div></td>
-                                <td class="el-table__cell is-leaf"><div class="cell">{{ metrics.memUsedGb }} G</div></td>
-                              </tr>
-                              <tr>
-                                <td class="el-table__cell is-leaf"><div class="cell">剩余内存</div></td>
-                                <td class="el-table__cell is-leaf"><div class="cell">{{ metrics.memFreeGb }} G</div></td>
-                              </tr>
-                              <tr>
-                                <td class="el-table__cell is-leaf"><div class="cell">使用率</div></td>
-                                <td class="el-table__cell is-leaf">
-                                  <div class="cell" :class="{'text-danger': metrics.memUsage > 80}">
-                                    {{ metrics.memUsage }}%
-                                  </div>
-                                </td>
-                              </tr>
-                            </tbody>
-                          </table>
+                    <el-col :span="6">
+                      <el-card shadow="hover">
+                        <template #header>实时 内存使用率</template>
+                        <div class="metric-value" style="font-size: 24px; font-weight: bold; color: #67C23A;">
+                          {{ metrics.memUsage }}%
                         </div>
                       </el-card>
                     </el-col>
                   </el-row>
 
-                  <!-- Grafana 面板嵌入 -->
-                  <!-- <el-row :gutter="15" style="margin-top: 20px;">
-                    <el-col :span="12" v-for="panel in panelList" :key="panel.id">
-                      <div class="grafana-container" style="border: 1px solid #ebeef5; border-radius: 4px; overflow: hidden;">
-                        <div class="panel-title" style="padding: 5px 10px; background: #f8f9fb; font-size: 12px; color: #606266; border-bottom: 1px solid #ebeef5;">
-                          {{ panel.name }}
-                        </div>
-                        <iframe
-                          :src="getGrafanaUrl(panel.id)"
-                          width="100%"
-                          height="250"
-                          frameborder="0"
-                          scrolling="no">
-                        </iframe>
-                      </div>
-                    </el-col>
-                  </el-row> -->
                 </div>
                 <el-empty v-else description="请从左侧选择设备" />
               </el-card>
@@ -125,8 +76,6 @@
               <el-card shadow="hover" class="main-content" style="margin-top: 20px;">
                 <template #header>
                   <span>节点设备操作系统基础信息与实时性能</span>
-                  <br>
-                  <span>{{ currentDevice?.name || '请选择设备' }}</span>
                 </template>
                 <div v-if="currentDevice">
                   <el-descriptions title="操作系统基础信息" :column="3" border>
@@ -191,6 +140,10 @@ const timer = ref(null)
 
 // 1. 定义响应式数据源
 const serverInfo = ref({}) // 存放若依后端获取的静态信息
+const hardwareDetail = ref({
+  cpu: { model: '-', vendor: '-', arch: '-', cores: 0, threads: 0, freq: '-' },
+  memory: { slots: [], totalSlots: 0 }
+});
 const metrics = ref({
   cpuUsage: 0,
   cpuFree: 100,
@@ -256,7 +209,54 @@ async function loadData(deviceName, isSilent = false) {
 
     // 并行请求：从 Prometheus 获取动态指标
     const instanceLabel = deviceName
-    
+
+    // 1. 定义需要查询的 PromQL
+    const queries = {
+      // CPU 静态信息 (从 Label 提取)
+      cpuInfo: `hardware_cpu_model_info{instance="${instanceLabel}"}`,
+      cpuCores: `hardware_cpu_cores_total{instance="${instanceLabel}"}`,
+      cpuThreads: `hardware_cpu_threads_total{instance="${instanceLabel}"}`,
+      cpuFreq: `hardware_cpu_frequency_hertz{instance="${instanceLabel}"}`,
+      // 内存静态信息
+      memSlots: `hardware_memory_slot_info{instance="${instanceLabel}"}`,
+      memTotalSlots: `hardware_memory_slots_total{instance="${instanceLabel}"}`
+    };
+
+    // 2. 并行请求所有自定义指标
+    const [cpuInfoRes, cpuCoresRes, cpuThreadsRes, cpuFreqRes, memSlotsRes, memTotalSlotsRes] = await Promise.all([
+      queryPrometheus(queries.cpuInfo),
+      queryPrometheus(queries.cpuCores),
+      queryPrometheus(queries.cpuThreads),
+      queryPrometheus(queries.cpuFreq),
+      queryPrometheus(queries.memSlots),
+      queryPrometheus(queries.memTotalSlots)
+    ]);
+
+    // 3. 解析 CPU 信息 (重点：从 metric 对象中提取 label)
+    const cpuMetric = cpuInfoRes.data?.result?.[0]?.metric || {};
+    hardwareDetail.value.cpu = {
+      model: cpuMetric.model || '-',
+      vendor: cpuMetric.vendor || '-',
+      arch: cpuMetric.architecture || '-',
+      cores: cpuCoresRes.data?.result?.[0]?.value?.[1] || 0,
+      threads: cpuThreadsRes.data?.result?.[0]?.value?.[1] || 0,
+      // 赫兹转GHz保留两位
+      freq: cpuFreqRes.data?.result?.[0]?.value?.[1] 
+            ? (parseFloat(cpuFreqRes.data?.result?.[0]?.value?.[1]) / 1e9).toFixed(2) + ' GHz' 
+            : '-'
+    };
+
+    // 4. 解析内存插槽信息 (可能有多条结果)
+    const slotResults = memSlotsRes.data?.result || [];
+    hardwareDetail.value.memory.slots = slotResults.map(item => ({
+      slot: item.metric.slot,
+      size: (parseFloat(item.metric.size_bytes) / (1024 ** 3)).toFixed(0) + ' GB',
+      type: item.metric.type,
+      speed: item.metric.speed_mhz + ' MHz',
+      manufacturer: item.metric.manufacturer
+    }));
+    hardwareDetail.value.memory.totalSlots = memTotalSlotsRes.data?.result?.[0]?.value?.[1] || 0;
+
     const [cpuRes, memRes, memTotalRes] = await Promise.all([
       // CPU 使用率 (%)
       queryPrometheus(`100 - (avg by(instance) (rate(node_cpu_seconds_total{instance="${instanceLabel}", mode="idle"}[1m])) * 100)`),
@@ -289,8 +289,11 @@ async function loadData(deviceName, isSilent = false) {
   } catch (error) {
     proxy.$modal.msgError("获取监控数据失败：" + error.message)
     // 失败时可以考虑重置 metrics 为 0
+    console.error(error)
   } finally {
-    proxy.$modal.closeLoading()
+    if (!isSilent) {
+      proxy.$modal.closeLoading()
+    }
   }
 }
 
