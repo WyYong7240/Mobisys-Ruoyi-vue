@@ -73,8 +73,9 @@ export const getDeviceTree = () => {
     const fullTree = buildTree(response.data, 0)
     // 过滤：只保留物理机设备根节点
     if (fullTree && fullTree.length > 0) {
-      const physicalNode = fullTree.find(node => node.deviceName === '物理机设备')
-      deviceTree.value = physicalNode ? [physicalNode] : []
+      // const physicalNode = fullTree.find(node => node.deviceName === '物理机设备')
+      // deviceTree.value = physicalNode ? [physicalNode] : []
+      deviceTree.value = fullTree.filter(node => node.deviceName === '物理机设备' || node.deviceName === '虚拟机')
     }
     console.log('[Debug - Tree] 设备树构建完成:', deviceTree.value)
     addPhysicalMastersToTree()

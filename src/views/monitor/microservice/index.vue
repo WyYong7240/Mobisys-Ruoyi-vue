@@ -2,7 +2,13 @@
   <div class="app-container">
     <div class="page-header">
       <span class="page-title">微服务监控</span>
-      <el-button size="small" @click="openNsManagerDialog">⚙️ 管理微服务命名空间</el-button>
+      <div>
+        <el-button-group style="margin-right:12px;">
+          <el-button size="small" :type="panelCols === 2 ? 'primary' : ''" @click="panelCols = 2">2列</el-button>
+          <el-button size="small" :type="panelCols === 4 ? 'primary' : ''" @click="panelCols = 4">4列</el-button>
+        </el-button-group>
+        <el-button size="small" @click="openNsManagerDialog">管理微服务命名空间</el-button>
+      </div>
     </div>
 
     <el-card shadow="never" class="filter-card">
@@ -11,7 +17,7 @@
           <el-select v-model="queryParams.namespace" placeholder="请先配置微服务命名空间" @change="handleNamespaceChange" :disabled="microserviceNamespaces.length === 0">
             <el-option v-for="item in microserviceNamespaces" :key="item" :label="item" :value="item" />
           </el-select>
-          <span v-if="microserviceNamespaces.length === 0" style="margin-left:8px;color:#e6a23c;font-size:12px;">⚠ 未配置，请点击右上角管理按钮添加</span>
+          <span v-if="microserviceNamespaces.length === 0" style="margin-left:8px;color:#e6a23c;font-size:12px;">未配置，请点击右上角管理按钮添加</span>
         </el-form-item>
         <el-form-item label="SERVICE">
           <el-select v-model="queryParams.service" placeholder="Select Service" @change="handleServiceChange">
@@ -24,45 +30,66 @@
           </el-select>
         </el-form-item>
         <el-form-item style="float:right;">
-          <el-button type="primary" size="small" @click="openAddMetricDialog">➕ 新增监控指标</el-button>
-          <el-button size="small" @click="refreshData">刷新</el-button>
+          <el-button type="primary" size="small" @click="openAddMetricDialog">新增监控指标</el-button>
+          <el-button @click="refreshData">刷新</el-button>
         </el-form-item>
       </el-form>
     </el-card>
 
-    <el-card shadow="never" class="stats-card">
-      <el-row :gutter="10">
-        <el-col :span="4" class="stat-item"><div class="stat-label">微服务命名空间数</div><div class="stat-value text-blue">{{ microserviceNamespaces.length }}</div></el-col>
-        <el-col :span="4" class="stat-item"><div class="stat-label">当前命名空间</div><div class="stat-value text-black">{{ queryParams.namespace || '-' }}</div></el-col>
-        <el-col :span="4" class="stat-item"><div class="stat-label">服务总数</div><div class="stat-value text-blue">{{ serviceOptions.length }}</div></el-col>
-        <el-col :span="4" class="stat-item"><div class="stat-label">当前服务</div><div class="stat-value text-black">{{ queryParams.service || '-' }}</div></el-col>
-        <el-col :span="4" class="stat-item"><div class="stat-label">Pod 总数</div><div class="stat-value text-blue">{{ realPodCount }}</div></el-col>
-        <el-col :span="4" class="stat-item"><div class="stat-label">当前 Pod</div><div class="stat-value text-black" style="font-size:13px;word-break:break-all;">{{ queryParams.pod || '-' }}</div></el-col>
-      </el-row>
+    <!-- 微服务基础信息 -->
+    <el-card shadow="never" class="info-card" style="margin-bottom:12px;">
+      <template #header>
+        <span style="font-weight:bold;font-size:14px;">微服务基础信息</span>
+      </template>
+      <el-descriptions :column="3" border size="small">
+        <el-descriptions-item label="集群命名空间总数">
+          <span class="text-blue" style="font-weight:bold">{{ microserviceNamespaces.length }}</span> 个微服务命名空间
+          <span style="color:#909399;font-size:12px;margin-left:6px">（集群共 {{ allNamespaces.length }} 个）</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="当前命名空间">
+          <el-tag size="small" type="success">{{ queryParams.namespace || '-' }}</el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="当前命名空间服务数">
+          <span class="text-blue" style="font-weight:bold">{{ serviceOptions.length }}</span> 个服务
+          <span style="color:#909399;font-size:12px;margin-left:6px">当前服务：{{ queryParams.service || '-' }}</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="当前服务 Pod 数">
+          <span class="text-blue" style="font-weight:bold">{{ realPodCount }}</span> 个 Pod
+          <span style="color:#909399;font-size:12px;margin-left:6px">当前 Pod：{{ queryParams.pod || '-' }}</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="监控指标数">
+          默认 <span class="text-blue" style="font-weight:bold">5</span> 项，自定义 <span class="text-blue" style="font-weight:bold">{{ customMetrics.length }}</span> 项
+        </el-descriptions-item>
+        <el-descriptions-item label="链路追踪">
+          <el-tag size="small" type="primary">Jaeger</el-tag>
+          <span style="color:#909399;font-size:12px;margin-left:6px">当前视图：{{ jaegerView === 'search' ? 'Trace 搜索' : '服务依赖拓扑' }}</span>
+        </el-descriptions-item>
+      </el-descriptions>
     </el-card>
 
     <el-row :gutter="15">
-      <el-col :span="12" v-for="panel in allPanels" :key="panel.id" style="margin-bottom:15px;">
-        <el-card shadow="hover" body-style="padding:0px;height:320px;overflow:hidden;">
+      <el-col :span="panelCols === 4 ? 6 : 12" v-for="panel in allPanels" :key="panel.id" style="margin-bottom:15px;">
+        <el-card shadow="hover" :body-style="panelCols === 4 ? 'padding:0px;height:260px;overflow:hidden;' : 'padding:0px;height:320px;overflow:hidden;'">
           <template #header>
             <div style="padding:8px 15px;font-size:13px;font-weight:bold;background:#f9f9f9;display:flex;justify-content:space-between;align-items:center;">
               <span>{{ panel.name }}</span>
               <div>
-                <el-button link type="primary" size="small" @click="editMetric(panel)">编辑</el-button>
-                <el-button v-if="panel.isCustom" link type="danger" size="small" @click="deleteMetric(panel.id)">删除</el-button>
+                <el-button type="primary" link size="small" @click="editMetric(panel)">编辑</el-button>
+                <el-button v-if="panel.isCustom" type="danger" link size="small" @click="deleteMetric(panel.id)">删除</el-button>
               </div>
             </div>
           </template>
-          <iframe :src="panel.isCustom ? getCustomGrafanaUrl(panel) : getGrafanaUrl(panel)" width="100%" height="330" frameborder="0" scrolling="no" style="margin-top:-10px;"></iframe>
+          <iframe :src="panel.isCustom ? getCustomGrafanaUrl(panel) : getGrafanaUrl(panel)" width="100%" :height="panelCols === 4 ? 270 : 330" frameborder="0" scrolling="no" style="margin-top:-10px;"></iframe>
         </el-card>
       </el-col>
     </el-row>
 
+    <!-- Jaeger 链路追踪 -->
     <el-card shadow="never" class="jaeger-card" style="margin-bottom:15px;">
       <template #header>
         <div class="jaeger-header">
           <div class="jaeger-header-left">
-            <span style="font-weight:bold;">🔗 链路追踪（Jaeger）</span>
+            <span style="font-weight:bold;">链路追踪（Jaeger）</span>
           </div>
           <div class="jaeger-header-right">
             <el-radio-group v-model="jaegerView" size="small" @change="onJaegerViewChange">
@@ -70,7 +97,7 @@
               <el-radio-button label="dependencies">服务依赖拓扑</el-radio-button>
             </el-radio-group>
             <el-tooltip content="在新窗口打开 Jaeger" placement="top">
-              <el-button size="small" style="margin-left:8px;" @click="openJaegerExternal">↗️ 打开</el-button>
+              <el-button size="small" style="margin-left:8px;" @click="openJaegerExternal">外部打开</el-button>
             </el-tooltip>
           </div>
         </div>
@@ -93,6 +120,7 @@
       </div>
     </el-card>
 
+    <!-- 管理微服务命名空间 对话框 -->
     <el-dialog title="管理微服务命名空间" v-model="nsManagerVisible" width="700px" @open="onNsManagerOpen">
       <div class="ns-manager">
         <div class="ns-manager__desc">从集群所有命名空间中，选择属于微服务的命名空间。</div>
@@ -101,36 +129,37 @@
             <div class="ns-panel-title">所有命名空间<span class="ns-panel-count">({{ allNamespacesFiltered.length }})</span></div>
             <div class="ns-search"><el-input v-model="nsSearchAll" size="small" placeholder="搜索..." clearable /></div>
             <div class="ns-list">
-              <div v-for="ns in allNamespacesFiltered" :key="ns" class="ns-item" :class="{'is-selected':tempMicroserviceNamespaces.includes(ns)}" @click="toggleNsSelection(ns)">
-                <span>{{ tempMicroserviceNamespaces.includes(ns) ? '✔️' : '➕' }}</span> {{ ns }}
+              <div v-for="ns in allNamespacesFiltered" :key="ns" class="ns-item" :class="{'is-selected': tempMicroserviceNamespaces.includes(ns)}" @click="toggleNsSelection(ns)">
+                <span v-if="tempMicroserviceNamespaces.includes(ns)">✓</span><span v-else>+</span>&nbsp;{{ ns }}
               </div>
-              <div v-if="allNamespacesFiltered.length===0" class="ns-empty">暂无数据</div>
+              <div v-if="allNamespacesFiltered.length === 0" class="ns-empty">暂无数据</div>
             </div>
           </el-col>
-          <el-col :span="2" class="ns-arrow-col"><span>➡️</span></el-col>
+          <el-col :span="2" class="ns-arrow-col">→</el-col>
           <el-col :span="11">
             <div class="ns-panel-title">已选微服务命名空间<span class="ns-panel-count">({{ tempMicroserviceNamespaces.length }})</span></div>
             <div class="ns-search"><el-input v-model="nsSearchSelected" size="small" placeholder="搜索已选..." clearable /></div>
             <div class="ns-list">
               <div v-for="ns in tempMicroserviceNamespacesFiltered" :key="ns" class="ns-item ns-item--selected">
-                {{ ns }}<span class="ns-item__remove" @click="removeNsSelection(ns)">❌</span>
+                {{ ns }}<span class="ns-item__remove" @click="removeNsSelection(ns)">✕</span>
               </div>
-              <div v-if="tempMicroserviceNamespacesFiltered.length===0" class="ns-empty">未选择任何命名空间</div>
+              <div v-if="tempMicroserviceNamespacesFiltered.length === 0" class="ns-empty">未选择任何命名空间</div>
             </div>
           </el-col>
         </el-row>
       </div>
       <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="nsManagerVisible=false">取消</el-button>
-          <el-button type="primary" @click="saveMicroserviceNamespaces" :loading="nsSaving">保存</el-button>
-        </span>
+        <el-button @click="nsManagerVisible = false">取消</el-button>
+        <el-button type="primary" @click="saveMicroserviceNamespaces" :loading="nsSaving">保存</el-button>
       </template>
     </el-dialog>
 
-    <el-dialog :title="metricForm.id?'编辑监控指标':'新增监控指标'" v-model="metricDialogVisible" width="650px" @close="resetMetricForm">
+    <!-- 新增/编辑监控指标 对话框 -->
+    <el-dialog :title="metricForm.id ? '编辑监控指标' : '新增监控指标'" v-model="metricDialogVisible" width="650px" @close="resetMetricForm">
       <el-form :model="metricForm" :rules="metricRules" ref="metricFormRef" label-width="140px">
-        <el-form-item label="指标名称" prop="name"><el-input v-model="metricForm.name" placeholder="请输入指标名称"></el-input></el-form-item>
+        <el-form-item label="指标名称" prop="name">
+          <el-input v-model="metricForm.name" placeholder="请输入指标名称" />
+        </el-form-item>
         <el-form-item label="应用范围" v-if="metricForm.isCustom">
           <el-radio-group v-model="metricForm.scope">
             <el-radio label="pod">当前Pod（{{ queryParams.pod }}）</el-radio>
@@ -138,63 +167,62 @@
             <el-radio label="namespace">当前Namespace（{{ queryParams.namespace }}）</el-radio>
           </el-radio-group>
         </el-form-item>
-        <el-form-item label="Grafana面板ID" v-if="!metricForm.isCustom"><el-input-number v-model="metricForm.grafanaPanelId" :min="1"></el-input-number></el-form-item>
+        <el-form-item label="Grafana面板ID" v-if="!metricForm.isCustom">
+          <el-input-number v-model="metricForm.grafanaPanelId" :min="1" />
+        </el-form-item>
         <el-form-item label="Prometheus查询" prop="promql" v-if="metricForm.isCustom">
-          <el-input v-model="metricForm.promql" type="textarea" :rows="4" placeholder='如：sum(rate(container_cpu_usage_seconds_total{namespace="$namespace",container="$service",pod=~"$Pod"}[5m]))'></el-input>
+          <el-input v-model="metricForm.promql" type="textarea" :rows="4" placeholder='如：sum(rate(container_cpu_usage_seconds_total{namespace="$namespace"}[5m]))' />
           <div style="font-size:12px;color:#909399;margin-top:4px;">支持变量：$namespace $service $Pod</div>
         </el-form-item>
         <el-form-item label="图表类型" v-if="metricForm.isCustom">
           <el-select v-model="metricForm.chartType">
-            <el-option label="时序图" value="graph"></el-option>
-            <el-option label="统计值" value="stat"></el-option>
-            <el-option label="仪表盘" value="gauge"></el-option>
-            <el-option label="柱状图" value="barchart"></el-option>
-            <el-option label="表格" value="table"></el-option>
+            <el-option label="时序图" value="graph" />
+            <el-option label="统计值" value="stat" />
+            <el-option label="仪表盘" value="gauge" />
+            <el-option label="柱状图" value="barchart" />
+            <el-option label="表格" value="table" />
           </el-select>
         </el-form-item>
         <el-form-item label="数值单位" v-if="metricForm.isCustom">
           <el-select v-model="metricForm.unit" filterable allow-create>
-            <el-option label="无单位" value="none"></el-option>
-            <el-option label="百分比" value="percent"></el-option>
-            <el-option label="字节" value="bytes"></el-option>
-            <el-option label="比特率" value="bps"></el-option>
-            <el-option label="秒" value="s"></el-option>
-            <el-option label="毫秒" value="ms"></el-option>
+            <el-option label="无单位" value="none" />
+            <el-option label="百分比" value="percent" />
+            <el-option label="字节" value="bytes" />
+            <el-option label="比特率" value="bps" />
+            <el-option label="秒" value="s" />
+            <el-option label="毫秒" value="ms" />
           </el-select>
         </el-form-item>
         <el-form-item label="时间范围">
           <el-select v-model="metricForm.timeRange">
-            <el-option label="最近5分钟" value="5m"></el-option>
-            <el-option label="最近15分钟" value="15m"></el-option>
-            <el-option label="最近30分钟" value="30m"></el-option>
-            <el-option label="最近1小时" value="1h"></el-option>
-            <el-option label="最近3小时" value="3h"></el-option>
-            <el-option label="最近6小时" value="6h"></el-option>
-            <el-option label="最近12小时" value="12h"></el-option>
-            <el-option label="最近24小时" value="24h"></el-option>
+            <el-option label="最近5分钟" value="5m" />
+            <el-option label="最近15分钟" value="15m" />
+            <el-option label="最近30分钟" value="30m" />
+            <el-option label="最近1小时" value="1h" />
+            <el-option label="最近3小时" value="3h" />
+            <el-option label="最近6小时" value="6h" />
+            <el-option label="最近12小时" value="12h" />
+            <el-option label="最近24小时" value="24h" />
           </el-select>
         </el-form-item>
         <el-form-item label="刷新间隔">
           <el-select v-model="metricForm.refreshInterval">
-            <el-option label="不刷新" value=""></el-option>
-            <el-option label="5秒" value="5s"></el-option>
-            <el-option label="10秒" value="10s"></el-option>
-            <el-option label="30秒" value="30s"></el-option>
-            <el-option label="1分钟" value="1m"></el-option>
-            <el-option label="5分钟" value="5m"></el-option>
+            <el-option label="不刷新" value="" />
+            <el-option label="5秒" value="5s" />
+            <el-option label="10秒" value="10s" />
+            <el-option label="30秒" value="30s" />
+            <el-option label="1分钟" value="1m" />
+            <el-option label="5分钟" value="5m" />
           </el-select>
         </el-form-item>
       </el-form>
       <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="metricDialogVisible=false">取消</el-button>
-          <el-button type="primary" @click="saveMetric">保存</el-button>
-        </span>
+        <el-button @click="metricDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="saveMetric">保存</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
-
 <script>
 import axios from 'axios';
 import { listPanelConfig, savePanelConfig, delPanelConfig, listMicroserviceNamespaces, saveMicroserviceNamespaces } from '@/api/monitor/microservice';
@@ -203,6 +231,7 @@ export default {
   name: 'MicroServiceMonitor',
   data() {
     return {
+      panelCols: 4,
       microserviceNamespaces: [],
       nsManagerVisible: false,
       nsSaving: false,

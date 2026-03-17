@@ -6,9 +6,9 @@ import request from '@/utils/request'
  */
 export function listJarsApps(query) {
   return request({
-    url: '/jars/app/list',
+    url: '/device/jars/list',
     method: 'get',
-    params: query
+    params: { pageNum: 1, pageSize: 1000, ...query }
   })
 }
 

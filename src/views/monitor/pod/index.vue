@@ -1,6 +1,7 @@
 <template>
   <div class="app-container">
     <div class="page-title">Pod 监控</div>
+    
     <el-card shadow="never" class="filter-card">
       <el-form :inline="true" size="small">
         <el-form-item label="命名空间">
@@ -9,65 +10,148 @@
           </el-select>
         </el-form-item>
         <el-form-item label="节点">
-          <el-select v-model="queryParams.node" placeholder="全部节点" @change="handleNodeChange" filterable clearable style="width:180px">
+          <el-select v-model="queryParams.node" placeholder="全部节点" @change="handleNodeChange" filterable clearable style="width:150px">
             <el-option label="全部节点" value="" />
             <el-option v-for="item in nodeOptions" :key="item" :label="item" :value="item" />
           </el-select>
         </el-form-item>
+        <el-form-item label="Pod 搜索">
+          <el-input v-model="podSearch" placeholder="模糊搜索 Pod 名" clearable style="width:180px" @input="handlePodSearchChange" />
+        </el-form-item>
         <el-form-item label="Pod">
-          <el-select v-model="queryParams.pod" placeholder="选择 Pod" @change="handlePodChange" filterable style="width:260px">
-            <el-option v-for="item in podOptions" :key="item" :label="item" :value="item" />
+          <el-select v-model="queryParams.pod" placeholder="选择 Pod" @change="handlePodChange" filterable style="width:220px">
+            <el-option v-for="item in filteredPodOptions" :key="item" :label="item" :value="item" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="Container">
+          <el-select v-model="queryParams.container" placeholder="全部容器" @change="handleContainerChange" filterable clearable style="width:160px">
+            <el-option label="全部容器" value="" />
+            <el-option v-for="item in containerOptions" :key="item" :label="item" :value="item" />
           </el-select>
         </el-form-item>
         <el-form-item style="float: right;">
-          <el-button type="primary" size="small" @click="openAddMetricDialog">➕ 新增监控指标</el-button>
+          <el-button-group style="margin-right:8px;">
+            <el-button size="small" :type="panelCols === 4 ? 'primary' : ''" @click="panelCols = 4">4列</el-button>
+            <el-button size="small" :type="panelCols === 2 ? 'primary' : ''" @click="panelCols = 2">2列</el-button>
+          </el-button-group>
+          <el-button type="primary" size="small" @click="openAddMetricDialog">新增监控指标</el-button>
           <el-button @click="refreshData">刷新</el-button>
         </el-form-item>
       </el-form>
     </el-card>
-    <el-card shadow="never" class="stats-card">
-      <el-row :gutter="10">
-        <el-col :span="4" class="stat-item"><div class="stat-label">命名空间总数</div><div class="stat-value text-blue">{{ namespaceOptions.length }}</div></el-col>
-        <el-col :span="4" class="stat-item"><div class="stat-label">当前命名空间</div><div class="stat-value text-black">{{ queryParams.namespace || '-' }}</div></el-col>
-        <el-col :span="4" class="stat-item"><div class="stat-label">节点总数</div><div class="stat-value text-blue">{{ nodeOptions.length }}</div></el-col>
-        <el-col :span="4" class="stat-item"><div class="stat-label">当前节点</div><div class="stat-value text-black">{{ queryParams.node || '全部' }}</div></el-col>
-        <el-col :span="4" class="stat-item"><div class="stat-label">Pod 总数</div><div class="stat-value text-blue">{{ realPodCount }}</div></el-col>
-        <el-col :span="4" class="stat-item"><div class="stat-label">当前 Pod</div><div class="stat-value text-black" style="font-size:13px;word-break:break-all;">{{ queryParams.pod || '-' }}</div></el-col>
-      </el-row>
+
+        <!-- Pod 基础信息 -->
+    <el-card shadow="never" class="info-card" style="margin-bottom:12px;">
+      <template #header>
+        <span style="font-weight:bold;font-size:14px;">Pod 基础信息</span>
+      </template>
+      <el-descriptions :column="3" border size="small">
+        <el-descriptions-item label="集群命名空间总数">
+          <span class="text-blue" style="font-weight:bold">{{ namespaceOptions.length }}</span> 个
+        </el-descriptions-item>
+        <el-descriptions-item label="当前命名空间">
+          <el-tag size="small" type="success">{{ queryParams.namespace || '-' }}</el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="当前命名空间节点数">
+          <span class="text-blue" style="font-weight:bold">{{ nodeOptions.length }}</span> 个
+          <span style="color:#909399;font-size:12px;margin-left:6px">当前节点：{{ queryParams.node || '全部' }}</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="当前节点 Pod 总数">
+          <span class="text-blue" style="font-weight:bold">{{ realPodCount }}</span> 个
+          <span style="color:#909399;font-size:12px;margin-left:6px">当前 Pod：{{ queryParams.pod || '-' }}</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="当前 Pod 容器数">
+          <span class="text-blue" style="font-weight:bold">{{ containerOptions.length }}</span> 个
+          <span style="color:#909399;font-size:12px;margin-left:6px">当前容器：{{ queryParams.container || '全部' }}</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="监控指标数">
+          默认 <span class="text-blue" style="font-weight:bold">5</span> 项，自定义 <span class="text-blue" style="font-weight:bold">{{ customMetrics.length }}</span> 项
+        </el-descriptions-item>
+      </el-descriptions>
     </el-card>
+
+
+    <!-- Pod 实时监控标题 -->
+    <div style="font-size:15px;font-weight:bold;color:#303133;margin-bottom:10px;padding-left:2px;border-left:3px solid #52c41a;padding-left:8px;">
+      Pod 实时监控
+    </div>
+
     <el-row :gutter="15">
-      <el-col :span="12" v-for="panel in allPanels" :key="panel.id" style="margin-bottom:15px;">
-        <el-card shadow="hover" body-style="padding:0px;height:320px;overflow:hidden;">
-          <div slot="header" style="padding:8px 15px;font-size:13px;font-weight:bold;background:#f9f9f9;display:flex;justify-content:space-between;align-items:center;">
-            <span>{{ panel.name }}</span>
-            <div><el-button type="text" size="mini" icon="el-icon-edit" @click="editMetric(panel)">编辑</el-button><el-button v-if="panel.isCustom" type="text" size="mini" icon="el-icon-delete" style="color:#f56c6c;" @click="deleteMetric(panel.id)">删除</el-button></div>
-          </div>
-          <iframe :src="panel.isCustom ? getCustomGrafanaUrl(panel) : getGrafanaUrl(panel)" width="100%" height="330" frameborder="0" scrolling="no" style="margin-top:-10px;"></iframe>
+      <el-col :span="panelCols === 4 ? 6 : 12" v-for="panel in allPanels" :key="panel.id" style="margin-bottom:15px;">
+        <el-card shadow="hover" :body-style="panelCols === 4 ? 'padding:0px;height:260px;overflow:hidden;' : 'padding:0px;height:320px;overflow:hidden;'">
+          <template #header>
+            <div style="padding:8px 15px;font-size:13px;font-weight:bold;background:#f9f9f9;display:flex;justify-content:space-between;align-items:center;">
+              <span>{{ panel.name }}</span>
+              <div>
+                <el-button type="primary" link size="small" @click="editMetric(panel)">编辑</el-button>
+                <el-button v-if="panel.isCustom" type="danger" link size="small" @click="deleteMetric(panel.id)">删除</el-button>
+              </div>
+            </div>
+          </template>
+          <iframe :src="panel.isCustom ? getCustomGrafanaUrl(panel) : getGrafanaUrl(panel)" width="100%" :height="panelCols === 4 ? 270 : 330" frameborder="0" scrolling="no" style="margin-top:-10px;"></iframe>
         </el-card>
       </el-col>
     </el-row>
-    <el-dialog :title="metricForm.id ? '编辑监控指标' : '新增监控指标'" :visible.sync="metricDialogVisible" width="620px" @close="resetMetricForm">
+
+    <!-- 新增/编辑监控指标 对话框 -->
+    <el-dialog :title="metricForm.id ? '编辑监控指标' : '新增监控指标'" v-model="metricDialogVisible" width="620px" @close="resetMetricForm">
       <el-form :model="metricForm" :rules="metricRules" ref="metricFormRef" label-width="130px">
-        <el-form-item label="指标名称" prop="name"><el-input v-model="metricForm.name" placeholder="请输入指标名称"></el-input></el-form-item>
-        <el-form-item label="Grafana面板ID" v-if="!metricForm.isCustom"><el-input-number v-model="metricForm.grafanaPanelId" :min="1"></el-input-number></el-form-item>
+        <el-form-item label="指标名称" prop="name">
+          <el-input v-model="metricForm.name" placeholder="请输入指标名称" />
+        </el-form-item>
+        <el-form-item label="Grafana面板ID" v-if="!metricForm.isCustom">
+          <el-input-number v-model="metricForm.grafanaPanelId" :min="1" />
+        </el-form-item>
         <el-form-item label="Prometheus查询" v-if="metricForm.isCustom">
-          <el-input v-model="metricForm.promql" type="textarea" :rows="4" placeholder='如：sum(rate(container_cpu_usage_seconds_total{namespace="$namespace",pod="$pod"}[5m]))'></el-input>
-          <div style="font-size:12px;color:#909399;margin-top:4px;">支持变量：$namespace $node $pod</div>
+          <el-input v-model="metricForm.promql" type="textarea" :rows="4" placeholder='如：sum(rate(container_cpu_usage_seconds_total{namespace="$namespace",pod="$pod"}[5m]))' />
+          <div style="font-size:12px;color:#909399;margin-top:4px;">支持变量：$namespace $node $pod $container</div>
         </el-form-item>
         <el-form-item label="图表类型" v-if="metricForm.isCustom">
-          <el-select v-model="metricForm.chartType"><el-option label="时序图" value="graph"></el-option><el-option label="统计值" value="stat"></el-option><el-option label="仪表盘" value="gauge"></el-option><el-option label="柱状图" value="barchart"></el-option><el-option label="表格" value="table"></el-option></el-select>
+          <el-select v-model="metricForm.chartType">
+            <el-option label="时序图" value="graph" />
+            <el-option label="统计值" value="stat" />
+            <el-option label="仪表盘" value="gauge" />
+            <el-option label="柱状图" value="barchart" />
+            <el-option label="表格" value="table" />
+          </el-select>
         </el-form-item>
         <el-form-item label="数值单位" v-if="metricForm.isCustom">
-          <el-select v-model="metricForm.unit" filterable allow-create><el-option label="无单位" value="none"></el-option><el-option label="百分比" value="percent"></el-option><el-option label="字节" value="bytes"></el-option><el-option label="比特率" value="bps"></el-option><el-option label="秒" value="s"></el-option><el-option label="毫秒" value="ms"></el-option></el-select>
+          <el-select v-model="metricForm.unit" filterable allow-create>
+            <el-option label="无单位" value="none" />
+            <el-option label="百分比" value="percent" />
+            <el-option label="字节" value="bytes" />
+            <el-option label="比特率" value="bps" />
+            <el-option label="秒" value="s" />
+            <el-option label="毫秒" value="ms" />
+          </el-select>
         </el-form-item>
         <el-form-item label="时间范围">
-          <el-select v-model="metricForm.timeRange"><el-option label="最近5分钟" value="5m"></el-option><el-option label="最近15分钟" value="15m"></el-option><el-option label="最近30分钟" value="30m"></el-option><el-option label="最近1小时" value="1h"></el-option><el-option label="最近3小时" value="3h"></el-option><el-option label="最近6小时" value="6h"></el-option><el-option label="最近12小时" value="12h"></el-option><el-option label="最近24小时" value="24h"></el-option></el-select>
+          <el-select v-model="metricForm.timeRange">
+            <el-option label="最近5分钟" value="5m" />
+            <el-option label="最近15分钟" value="15m" />
+            <el-option label="最近30分钟" value="30m" />
+            <el-option label="最近1小时" value="1h" />
+            <el-option label="最近3小时" value="3h" />
+            <el-option label="最近6小时" value="6h" />
+            <el-option label="最近12小时" value="12h" />
+            <el-option label="最近24小时" value="24h" />
+          </el-select>
         </el-form-item>
         <el-form-item label="刷新间隔">
-          <el-select v-model="metricForm.refreshInterval"><el-option label="不刷新" value=""></el-option><el-option label="5秒" value="5s"></el-option><el-option label="10秒" value="10s"></el-option><el-option label="30秒" value="30s"></el-option><el-option label="1分钟" value="1m"></el-option><el-option label="5分钟" value="5m"></el-option></el-select>
+          <el-select v-model="metricForm.refreshInterval">
+            <el-option label="不刷新" value="" />
+            <el-option label="5秒" value="5s" />
+            <el-option label="10秒" value="10s" />
+            <el-option label="30秒" value="30s" />
+            <el-option label="1分钟" value="1m" />
+            <el-option label="5分钟" value="5m" />
+          </el-select>
         </el-form-item>
       </el-form>
-      <div slot="footer"><el-button @click="metricDialogVisible = false">取消</el-button><el-button type="primary" @click="saveMetric">保存</el-button></div>
+      <template #footer>
+        <el-button @click="metricDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="saveMetric">保存</el-button>
+      </template>
     </el-dialog>
   </div>
 </template>
@@ -78,8 +162,10 @@ export default {
   name: "PodMonitor",
   data() {
     return {
-      queryParams: { namespace: '', node: '', pod: '' },
-      namespaceOptions: [], nodeOptions: [], podOptions: [],
+      queryParams: { namespace: '', node: '', pod: '', container: '' },
+      panelCols: 4,
+      podSearch: '',
+      namespaceOptions: [], nodeOptions: [], podOptions: [], containerOptions: [],
       grafanaBaseUrl: "http://39.98.35.84:6004/d-solo/aa347ca0-0f9d-4716-a151-9494379e4405/microservice-pod",
       defaultPanels: [
         { id: 'pod_default_1', grafanaPanelId: 1, name: 'CPU 使用率',  isCustom: false, timeRange: '5m', refreshInterval: '30s' },
@@ -95,14 +181,23 @@ export default {
   },
   computed: {
     realPodCount() { return this.podOptions.filter(i => i !== 'All').length; },
-    allPanels() { return [...this.defaultPanels, ...this.customMetrics]; }
+    allPanels() { return [...this.defaultPanels, ...this.customMetrics]; },
+    // Pod 列表经过搜索 + 状态双重过滤
+    filteredPodOptions() {
+      let list = this.podOptions;
+      // 名称搜索过滤
+      if (this.podSearch) {
+        const kw = this.podSearch.toLowerCase();
+        list = list.filter(p => p === 'All' || p.toLowerCase().includes(kw));
+      }
+      return list;
+    }
   },
   created() { this.init(); },
   methods: {
     async init() {
       try { await this.fetchNamespaces(); } catch (e) { console.error('初始化失败', e); }
     },
-
     async fetchNamespaces() {
       try {
         const res = await axios.get('/api/datasources/proxy/1/api/v1/label/namespace/values');
@@ -121,7 +216,7 @@ export default {
         const url = `/api/datasources/proxy/1/api/v1/label/node/values?match[]=container_memory_working_set_bytes{namespace="${ns}",container!="",container!="POD"}&start=${start}&end=${now}`;
         const res = await axios.get(url);
         if (res.data.status === 'success') this.nodeOptions = res.data.data;
-      } catch (e) { console.warn('节点列表获取失败(需kube-state-metrics)', e); }
+      } catch (e) { console.warn('节点列表获取失败', e); }
     },
     async fetchPods() {
       const ns = this.queryParams.namespace;
@@ -142,21 +237,68 @@ export default {
         } catch (e) { console.warn('按节点过滤Pod失败', e); }
       }
       this.podOptions = ['All', ...pods];
-      if (!this.podOptions.includes(this.queryParams.pod)) this.queryParams.pod = 'All';
+      if (!this.filteredPodOptions.includes(this.queryParams.pod)) this.queryParams.pod = this.filteredPodOptions[0] || 'All';
+      await this.fetchContainers();
       await this.loadSavedConfig();
     },
-    handleNamespaceChange() { this.queryParams.node = ''; this.nodeOptions = []; this.podOptions = []; this.fetchNodes(); this.fetchPods(); },
+    async fetchContainers() {
+      try {
+        const ns = this.queryParams.namespace;
+        const pod = this.queryParams.pod;
+        const now = Math.floor(Date.now() / 1000), start = now - 300;
+        const podFilter = pod && pod !== 'All' ? `,pod="${pod}"` : '';
+        const url = `/api/datasources/proxy/1/api/v1/label/container/values?match[]=container_memory_working_set_bytes{namespace="${ns}"${podFilter},container!="",container!="POD"}&start=${start}&end=${now}`;
+        const res = await axios.get(url);
+        if (res.data.status === 'success') {
+          this.containerOptions = res.data.data;
+          if (this.queryParams.container && !this.containerOptions.includes(this.queryParams.container))
+            this.queryParams.container = '';
+        }
+      } catch (e) { console.warn('获取容器列表失败', e); }
+    },
+    async fetchPodStatus() {
+      try {
+        const ns = this.queryParams.namespace;
+        const url = `/api/datasources/proxy/1/api/v1/query?query=kube_pod_status_phase{namespace="${ns}"}==1`;
+        const res = await axios.get(url);
+        if (res.data.status === 'success') {
+          const map = {};
+          res.data.data.result.forEach(item => { if (item.metric.pod) map[item.metric.pod] = item.metric.phase; });
+          this.podStatusMap = map;
+        }
+      } catch (e) { /* kube-state-metrics 不可用时静默忽略 */ }
+    },
+    handleNamespaceChange() {
+      this.queryParams.node = ''; this.queryParams.container = '';
+      this.nodeOptions = []; this.podOptions = []; this.containerOptions = [];
+      this.podSearch = '';
+      this.fetchNodes(); this.fetchPods();
+    },
     handleNodeChange() { this.podOptions = []; this.fetchPods(); },
-    async handlePodChange() { await this.loadSavedConfig(); },
+    handlePodSearchChange() {
+      if (!this.filteredPodOptions.includes(this.queryParams.pod))
+        this.queryParams.pod = this.filteredPodOptions[0] || 'All';
+    },
+async handlePodStatusChange() {
+  await this.fetchPodStatus();
+  if (!this.filteredPodOptions.includes(this.queryParams.pod))
+    this.queryParams.pod = this.filteredPodOptions[0] || 'All';
+},
+    async handlePodChange() { await Promise.all([this.fetchContainers(), this.loadSavedConfig()]); },
+    async handleContainerChange() { await this.loadSavedConfig(); },
     refreshData() { this.fetchNamespaces(); this.$message.success('数据已更新'); },
     getGrafanaUrl(panel) {
-      const params = new URLSearchParams({ orgId: 1, theme: 'light', from: `now-${panel.timeRange || '5m'}`, to: 'now', refresh: panel.refreshInterval || '', panelId: panel.grafanaPanelId, 'var-namespace': this.queryParams.namespace, 'var-service': '', 'var-Pod': this.queryParams.pod });
+      const params = new URLSearchParams({ orgId: 1, theme: 'light', from: `now-${panel.timeRange || '5m'}`, to: 'now', refresh: panel.refreshInterval || '', panelId: panel.grafanaPanelId, 'var-namespace': this.queryParams.namespace, 'var-service': this.queryParams.container || '', 'var-Pod': this.queryParams.pod });
       return `${this.grafanaBaseUrl}?${params.toString()}`;
     },
     getCustomGrafanaUrl(panel) {
-      const ns = this.queryParams.namespace, node = this.queryParams.node, pod = this.queryParams.pod;
+      const ns = this.queryParams.namespace, node = this.queryParams.node, pod = this.queryParams.pod, container = this.queryParams.container;
       const podVal = pod === 'All' ? '.*' : pod;
-      const resolvedQuery = panel.promql.replace(/\$\{namespace\}|\$namespace/g, ns).replace(/\$\{node\}|\$node/g, node || '.*').replace(/\$\{pod\}|\$pod/g, podVal);
+      const resolvedQuery = panel.promql
+        .replace(/\$\{namespace\}|\$namespace/g, ns)
+        .replace(/\$\{node\}|\$node/g, node || '.*')
+        .replace(/\$\{pod\}|\$pod/g, podVal)
+        .replace(/\$\{container\}|\$container/g, container || '.*');
       const panelId = ({ graph: 1, timeseries: 1, stat: 2, gauge: 3, barchart: 4, table: 5 })[panel.chartType] || 1;
       const params = new URLSearchParams({ orgId: 1, theme: 'light', from: `now-${panel.timeRange}`, to: 'now', refresh: panel.refreshInterval || '', panelId, 'var-namespace': ns, 'var-Pod': podVal, 'var-query': resolvedQuery, 'var-title': panel.name });
       return `http://39.98.35.84:6004/d-solo/custom-metrics/custom-metrics-dashboard?${params.toString()}`;
@@ -225,7 +367,6 @@ export default {
   }
 }
 </script>
-
 <style scoped>
 .page-title { margin: 0 0 10px 0; font-size: 18px; font-weight: 700; color: #303133; }
 .filter-card { margin-bottom: 10px; background-color: #fcfcfc; }
@@ -237,3 +378,4 @@ export default {
 .text-blue { color: #1890ff; }
 .text-black { color: #303133; }
 </style>
+          
