@@ -166,7 +166,7 @@ export default {
       panelCols: 4,
       podSearch: '',
       namespaceOptions: [], nodeOptions: [], podOptions: [], containerOptions: [],
-      grafanaBaseUrl: "http://39.98.35.84:6004/d-solo/aa347ca0-0f9d-4716-a151-9494379e4405/microservice-pod",
+      grafanaBaseUrl: "http://192.168.31.34:32556/d-solo/aa347ca0-0f9d-4716-a151-9494379e4405/microservice-pod",
       defaultPanels: [
         { id: 'pod_default_1', grafanaPanelId: 1, name: 'CPU 使用率',  isCustom: false, timeRange: '5m', refreshInterval: '30s' },
         { id: 'pod_default_2', grafanaPanelId: 2, name: '内存使用率',  isCustom: false, timeRange: '5m', refreshInterval: '30s' },
@@ -301,7 +301,7 @@ async handlePodStatusChange() {
         .replace(/\$\{container\}|\$container/g, container || '.*');
       const panelId = ({ graph: 1, timeseries: 1, stat: 2, gauge: 3, barchart: 4, table: 5 })[panel.chartType] || 1;
       const params = new URLSearchParams({ orgId: 1, theme: 'light', from: `now-${panel.timeRange}`, to: 'now', refresh: panel.refreshInterval || '', panelId, 'var-namespace': ns, 'var-Pod': podVal, 'var-query': resolvedQuery, 'var-title': panel.name });
-      return `http://39.98.35.84:6004/d-solo/custom-metrics/custom-metrics-dashboard?${params.toString()}`;
+      return `http://192.168.31.34:32556/d-solo/custom-metrics/custom-metrics-dashboard?${params.toString()}`;
     },
     openAddMetricDialog() { this.resetMetricForm(); this.metricForm.isCustom = true; this.metricDialogVisible = true; },
     editMetric(panel) { this.metricForm = { ...panel }; this.metricDialogVisible = true; },

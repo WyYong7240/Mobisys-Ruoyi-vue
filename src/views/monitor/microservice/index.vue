@@ -242,7 +242,7 @@ export default {
       queryParams: { namespace: '', service: '', pod: '' },
       serviceOptions: [],
       podOptions: [],
-      grafanaBaseUrl: 'http://39.98.35.84:6004/d-solo/aa347ca0-0f9d-4716-a151-9494379e4405/microservice-pod',
+      grafanaBaseUrl: 'http://192.168.31.34:32556/d-solo/aa347ca0-0f9d-4716-a151-9494379e4405/microservice-pod',
       defaultPanels: [
         { id: 'default_1', grafanaPanelId: 1, name: 'CPU 使用率',  isCustom: false, timeRange: '5m', refreshInterval: '30s' },
         { id: 'default_2', grafanaPanelId: 2, name: '内存使用率',  isCustom: false, timeRange: '5m', refreshInterval: '30s' },
@@ -255,7 +255,7 @@ export default {
       metricForm: { id: null, name: '', grafanaPanelId: null, promql: '', chartType: 'graph', unit: 'none', timeRange: '5m', refreshInterval: '30s', isCustom: true, scope: 'pod' },
       metricRules: { name: [{ required: true, message: '请输入指标名称', trigger: 'blur' }] },
       // Jaeger
-      jaegerBaseUrl: 'http://39.98.35.84:6003',
+      jaegerBaseUrl: 'http://192.168.31.34:32686',
       jaegerService: '',
       jaegerView: 'search',
       jaegerSrc: ''
@@ -373,7 +373,7 @@ export default {
       const q = panel.promql.replace(/\$\{namespace\}|\$namespace/g, ns).replace(/\$\{service\}|\$service/g, svc).replace(/\$\{Pod\}|\$Pod/g, podVal);
       const panelId = { graph:1, timeseries:1, stat:2, gauge:3, barchart:4, table:5 }[panel.chartType] || 1;
       const p = new URLSearchParams({ orgId:1, theme:'light', from:`now-${panel.timeRange}`, to:'now', refresh:panel.refreshInterval||'', panelId, 'var-namespace':ns, 'var-service':svc, 'var-Pod':podVal, 'var-query':q, 'var-title':panel.name });
-      return `http://39.98.35.84:6004/d-solo/custom-metrics/custom-metrics-dashboard?${p.toString()}`;
+      return `http://192.168.31.34:32556/d-solo/custom-metrics/custom-metrics-dashboard?${p.toString()}`;
     },
     saveMetric() {
       this.$refs.metricFormRef.validate(async valid => {

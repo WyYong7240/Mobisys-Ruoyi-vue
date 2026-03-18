@@ -126,6 +126,14 @@ import { reactive, ref, onMounted } from "vue"
 import { listDatabase } from "@/api/device/database"
 
 /**
+ * ✅ 设备类型映射（核心修复点）
+ */
+const deviceTypeMap = {
+  7: "MySQL",
+  8: "Elasticsearch"
+}
+
+/**
  * 数据库树
  */
 const dbTree = ref([])
@@ -157,24 +165,18 @@ const grafanaBaseUrl =
   "http://192.168.31.34:32556/d-solo/549c2bf8936f7767ea6ac47c47b00f2a/mysql-exporter-quickstart-and-dashboard"
 
 /**
- * 面板列表（你提供的 panelId）
+ * 面板列表
  */
 const panelList = ref([
   { id: 12, name: "运行时间", desc: "数据库运行时长" },
-
   { id: 13, name: "QPS（每秒查询数）", desc: "数据库每秒处理的查询数量" },
   { id: 92, name: "连接数", desc: "当前数据库连接数" },
-
   { id: 51, name: "InnoDB缓冲池", desc: "Buffer Pool 使用情况" },
   { id: 50, name: "内存概览", desc: "MySQL 内部内存使用情况" },
-
   { id: 11, name: "线程缓存池", desc: "线程复用情况" },
   { id: 10, name: "客户端线程状态", desc: "客户端连接线程状态" },
-
   { id: 53, name: "客户端查询次数", desc: "客户端查询总量" },
   { id: 9, name: "网络流量", desc: "数据库网络收发情况" }
-
-
 ])
 
 /**
@@ -189,28 +191,28 @@ const getGrafanaUrl = (panelId) => {
     refresh: "5s",
     theme: "light",
     "var-job": "mysql-exporter",
-    "var-instance": `${dbInfo.ip}:${dbInfo.port}`  
+    "var-instance": `${dbInfo.ip}:${dbInfo.port}`
   })
 
   return `${grafanaBaseUrl}?${params.toString()}`
 }
 
 /**
- * 获取数据库列表
+ * 获取数据库列表（已修复类型）
  */
 function getDbTree() {
 
   listDatabase().then(res => {
 
     const list = res.rows
-    const mysqlChildren = []
+    const children = []
 
     list.forEach(item => {
 
-      mysqlChildren.push({
+      children.push({
         id: item.databaseId,
         label: item.databaseName,
-        type: "MySQL",
+        type: deviceTypeMap[item.deviceId] || "未知类型", // ✅ 核心
         ip: item.ipAddress,
         port: item.port,
         version: item.version || "5.7",
@@ -225,8 +227,8 @@ function getDbTree() {
     dbTree.value = [
       {
         id: 1,
-        label: "MySQL",
-        children: mysqlChildren
+        label: "数据库",
+        children: children
       }
     ]
 

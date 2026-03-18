@@ -3,7 +3,13 @@
 
     <div class="page-header">
       <span class="page-title">Jars 应用监控</span>
-      <el-button size="small" icon="el-icon-plus" type="primary" @click="openAddMetricDialog">新增自定义指标</el-button>
+      <div>
+        <el-button-group style="margin-right:12px;">
+          <el-button size="small" :type="panelCols === 2 ? 'primary' : ''" @click="panelCols = 2">2列</el-button>
+          <el-button size="small" :type="panelCols === 4 ? 'primary' : ''" @click="panelCols = 4">4列</el-button>
+        </el-button-group>
+        <el-button size="small" icon="el-icon-plus" type="primary" @click="openAddMetricDialog">新增自定义指标</el-button>
+      </div>
     </div>
 
     <el-card shadow="never" class="filter-card">
@@ -37,25 +43,42 @@
         <div slot="header" class="app-info-header">
           <i class="el-icon-s-platform" style="color:#409eff;margin-right:6px"></i>
           <span style="font-weight:bold">{{ currentApp.appName }}</span>
-          <el-tag size="mini" :type="currentApp.status === 'running' ? 'success' : 'danger'" style="margin-left:8px">{{ currentApp.status === 'running' ? '运行中' : '已停止' }}</el-tag>
+          
         </div>
-        <el-row :gutter="24">
-          <el-col :span="12">
-            <div class="info-row"><span class="info-label">启动命令</span><el-tooltip :content="currentApp.startCmd" placement="top" :disabled="!currentApp.startCmd"><span class="info-value code-text">{{ currentApp.startCmd || '-' }}</span></el-tooltip></div>
-            <div class="info-row"><span class="info-label">工作目录</span><span class="info-value code-text">{{ currentApp.workDir || '-' }}</span></div>
-          </el-col>
-          <el-col :span="12">
-            <div class="info-row"><span class="info-label">资源限制</span><span class="info-value">{{ currentApp.resourceLimit || '-' }}</span></div>
-            <div class="info-row"><span class="info-label">所在设备</span><span class="info-value">{{ currentApp.ipAddress || currentApp.device || '-' }}</span></div>
-          </el-col>
-        </el-row>
+        <el-descriptions :column="3" border size="small">
+          <el-descriptions-item label="启动命令" :span="2">
+            <el-tooltip :content="currentApp.startCmd" placement="top" :disabled="!currentApp.startCmd">
+              <span class="code-text">{{ currentApp.startCmd || '-' }}</span>
+            </el-tooltip>
+          </el-descriptions-item>
+          <el-descriptions-item label="所在设备">
+            {{ currentApp.ipAddress || currentApp.device || '-' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="工作目录" :span="2">
+            <span class="code-text">{{ currentApp.workDir || '-' }}</span>
+          </el-descriptions-item>
+          <el-descriptions-item label="运行时长">
+            {{ processStatus.uptimeText || '-' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="Java版本">
+            {{ currentApp.javaVersion || '-' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="负责人">
+            {{ currentApp.leader || '-' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="运行状态">
+            <span v-if="processStatus.isRunning === null" style="color:#909399">查询中...</span>
+            <el-tag v-else-if="processStatus.isRunning" type="success" size="mini">运行中</el-tag>
+            <el-tag v-else type="danger" size="mini">未运行</el-tag>
+          </el-descriptions-item>
+        </el-descriptions>
       </el-card>
     </transition>
 
 
     <el-row :gutter="15">
-      <el-col :span="12" v-for="panel in allPanels" :key="panel.id" style="margin-bottom:15px;">
-        <el-card shadow="hover" body-style="padding:0;height:320px;overflow:hidden;">
+      <el-col :span="panelCols === 4 ? 6 : 12" v-for="panel in allPanels" :key="panel.id" style="margin-bottom:15px;">
+        <el-card shadow="hover" :body-style="panelCols === 4 ? 'padding:0;height:260px;overflow:hidden;' : 'padding:0;height:320px;overflow:hidden;'">
           <div slot="header" style="padding:8px 15px;font-size:13px;font-weight:bold;background:#f9fafb;display:flex;justify-content:space-between;align-items:center;">
             <span>{{ panel.name }}</span>
             <div>
@@ -63,7 +86,7 @@
               <el-button v-if="panel.isCustom" type="text" size="mini" icon="el-icon-delete" style="color:#f56c6c;" @click="deleteMetric(panel.id)"></el-button>
             </div>
           </div>
-          <iframe :src="panel.isCustom ? getCustomGrafanaUrl(panel) : getGrafanaUrl(panel)" width="100%" height="330" frameborder="0" scrolling="no" style="margin-top:-10px;"></iframe>
+          <iframe :src="panel.isCustom ? getCustomGrafanaUrl(panel) : getGrafanaUrl(panel)" width="100%" :height="panelCols === 4 ? 270 : 330" frameborder="0" scrolling="no" style="margin-top:-10px;"></iframe>
         </el-card>
       </el-col>
     </el-row>
@@ -155,18 +178,25 @@ export default {
   name: 'JarsMonitor',
   data() {
     return {
-      grafanaBaseUrl: 'http://39.98.35.84:6004/d-solo/ce228ddf-bb69-4363-8a15-4cab4c51a5cf/jars-monitor',
+      grafanaBaseUrl: 'http://192.168.31.34:32556/d-solo/ce228ddf-bb69-4363-8a15-4cab4c51a5cf/petclinic-monitor',
+      panelCols: 4,
+      refreshKey: 0,
       appsLoading: false,
       allApps: [],
       physicalNameMap: {},  // { physicalId: 'node1' }
       queryParams: { device: 'All', category: 'All', appName: 'All' },
       defaultPanels: [
-        { id: 'default_1', grafanaPanelId: 1, name: 'CPU 使用率',  isCustom: false, timeRange: '5m', refreshInterval: '30s' },
-        { id: 'default_2', grafanaPanelId: 2, name: 'JVM 堆内存', isCustom: false, timeRange: '5m', refreshInterval: '30s' },
-        { id: 'default_3', grafanaPanelId: 3, name: '线程数',      isCustom: false, timeRange: '5m', refreshInterval: '30s' },
-        { id: 'default_4', grafanaPanelId: 4, name: 'GC 次数',    isCustom: false, timeRange: '5m', refreshInterval: '30s' }
+        { id: 'default_1', grafanaPanelId: 1, name: 'CPU 使用',       isCustom: false, timeRange: '5m', refreshInterval: '30s' },
+        { id: 'default_2', grafanaPanelId: 2, name: '内存使用（MB）',  isCustom: false, timeRange: '5m', refreshInterval: '30s' },
+        { id: 'default_3', grafanaPanelId: 4, name: '线程数',          isCustom: false, timeRange: '5m', refreshInterval: '30s' },
+        { id: 'default_4', grafanaPanelId: 3, name: '打开文件描述符',   isCustom: false, timeRange: '5m', refreshInterval: '30s' }
       ],
       customMetrics: [],
+      processStatus: {
+        isRunning: null,
+        uptimeSeconds: null,
+        uptimeText: ''
+      },
       metricDialogVisible: false,
       metricForm: { id: null, name: '', promql: '', chartType: 'graph', unit: 'none', timeRange: '5m', refreshInterval: '30s', isCustom: true, scope: 'app' },
       metricRules: {
@@ -198,7 +228,10 @@ export default {
     },
     currentApp() {
       if (!this.queryParams.appName || this.queryParams.appName === 'All') return null
-      return this.allApps.find(a => a.appName === this.queryParams.appName) || null
+      return this.allApps.find(a =>
+        a.appName === this.queryParams.appName &&
+        (this.queryParams.device === 'All' || a.ipAddress === this.queryParams.device)
+      ) || null
     },
     allPanels() {
       return [...this.defaultPanels, ...this.customMetrics]
@@ -207,6 +240,23 @@ export default {
 
   created() {
     this.loadApps()
+  },
+
+  watch: {
+    currentApp(val) {
+      if (val) {
+        this.queryProcessStatus(val)
+      } else {
+        this.processStatus = { isRunning: null, uptimeSeconds: null, uptimeText: '' }
+      }
+      this.refreshKey++
+    },
+    'queryParams.device'() {
+      this.refreshKey++
+    },
+    'queryParams.appName'() {
+      this.refreshKey++
+    }
   },
 
   methods: {
@@ -257,6 +307,7 @@ export default {
         this.queryParams.appName = this.appOptions[0].appName
         this.loadSavedConfig()
       }
+      this.refreshKey++
     },
 
     handleCategoryChange() {
@@ -278,13 +329,19 @@ export default {
     },
 
     getGrafanaUrl(panel) {
+      // device_ip: 当前应用的 IP 地址
+      // application: process-exporter 的 groupname（即 jar 包名或进程名）
+      const deviceIp = this.currentApp ? (this.currentApp.ipAddress || '') : ''
+      const application = this.queryParams.appName === 'All' ? '' : this.queryParams.appName
       const p = new URLSearchParams({
-        orgId: 1, theme: 'light', panelId: panel.grafanaPanelId,
-        from: `now-${panel.timeRange || '5m'}`, to: 'now',
+        orgId: 1,
+        theme: 'light',
+        panelId: panel.grafanaPanelId,
+        from: `now-${panel.timeRange || '5m'}`,
+        to: 'now',
         refresh: panel.refreshInterval || '',
-        'var-device': this.queryParams.device,
-        'var-category': this.queryParams.category,
-        'var-appName': this.queryParams.appName
+        'var-device_ip': deviceIp,
+        'var-application': application
       })
       return `${this.grafanaBaseUrl}?${p.toString()}`
     },
@@ -304,7 +361,7 @@ export default {
         'var-device': device, 'var-category': category, 'var-appName': appName,
         'var-query': q, 'var-title': panel.name
       })
-      return `http://39.98.35.84:6004/d-solo/jars-custom-metrics/jars-custom-metrics?${p.toString()}`
+      return `http://192.168.31.34:32556/d-solo/jars-custom-metrics/jars-custom-metrics?${p.toString()}`
     },
 
     openAddMetricDialog() {
@@ -375,15 +432,58 @@ export default {
         }).catch(() => {})
     },
 
+    async queryProcessStatus(app) {
+      this.processStatus = { isRunning: null, uptimeSeconds: null, uptimeText: '' }
+      try {
+        const baseUrl  = 'http://192.168.31.34:30090/api/v1'
+        const deviceIp = app.ipAddress || ''
+        const appName  = app.appName   || 'java'
+        const filter   = `node_ip="${deviceIp}",groupname=~".*${appName}.*"`
+
+        const [stateResp, startResp] = await Promise.all([
+          fetch(`${baseUrl}/query?query=namedprocess_namegroup_num_procs{${filter}}`),
+          fetch(`${baseUrl}/query?query=namedprocess_namegroup_oldest_start_time_seconds{${filter}}`)
+        ])
+        const stateData = await stateResp.json()
+        const startData = await startResp.json()
+
+        const numProcs = parseFloat((stateData?.data?.result?.[0]?.value?.[1]) || '0')
+        this.processStatus.isRunning = numProcs > 0
+
+        const startTs = parseFloat((startData?.data?.result?.[0]?.value?.[1]) || '0')
+        if (startTs > 0) {
+          const uptimeSec = Math.floor(Date.now() / 1000 - startTs)
+          this.processStatus.uptimeSeconds = uptimeSec
+          this.processStatus.uptimeText    = this.formatUptime(uptimeSec)
+        }
+      } catch (e) {
+        console.warn('进程状态查询失败', e)
+        this.processStatus.isRunning = false
+      }
+    },
+
+    formatUptime(seconds) {
+      if (seconds < 60)    return `${seconds} 秒`
+      if (seconds < 3600)  return `${Math.floor(seconds / 60)} 分钟`
+      if (seconds < 86400) {
+        const h = Math.floor(seconds / 3600)
+        const m = Math.floor((seconds % 3600) / 60)
+        return `${h} 小时 ${m} 分钟`
+      }
+      const d = Math.floor(seconds / 86400)
+      const h = Math.floor((seconds % 86400) / 3600)
+      return `${d} 天 ${h} 小时`
+    },
+
     async loadSavedConfig() {
       const { device, category, appName } = this.queryParams
       if (appName === 'All') return
       this.customMetrics = []
       this.defaultPanels = [
-        { id: 'default_1', grafanaPanelId: 1, name: 'CPU 使用率',  isCustom: false, timeRange: '5m', refreshInterval: '30s' },
-        { id: 'default_2', grafanaPanelId: 2, name: 'JVM 堆内存', isCustom: false, timeRange: '5m', refreshInterval: '30s' },
-        { id: 'default_3', grafanaPanelId: 3, name: '线程数',      isCustom: false, timeRange: '5m', refreshInterval: '30s' },
-        { id: 'default_4', grafanaPanelId: 4, name: 'GC 次数',    isCustom: false, timeRange: '5m', refreshInterval: '30s' }
+        { id: 'default_1', grafanaPanelId: 1, name: 'CPU 使用',         isCustom: false, timeRange: '5m', refreshInterval: '30s' },
+        { id: 'default_2', grafanaPanelId: 2, name: '内存使用（MB）',   isCustom: false, timeRange: '5m', refreshInterval: '30s' },
+        { id: 'default_3', grafanaPanelId: 4, name: '线程数',           isCustom: false, timeRange: '5m', refreshInterval: '30s' },
+        { id: 'default_4', grafanaPanelId: 3, name: '打开文件描述符数', isCustom: false, timeRange: '5m', refreshInterval: '30s' }
       ]
       try {
         // 按作用域从窄到宽加载：当前应用、当前分类、当前设备、全局
