@@ -22,12 +22,6 @@
             <el-option label="P3（警告）" :value="3" />
           </el-select>
         </el-form-item>
-        <el-form-item label="数据源">
-          <el-select v-model="queryParams.datasourceId" placeholder="全部数据源" clearable style="width:180px">
-            <el-option v-for="ds in datasources" :key="ds.id" :label="ds.name" :value="ds.id" />
-          </el-select>
-        </el-form-item>
-
         <el-form-item>
           <el-button type="primary" @click="fetchList">查询</el-button>
           <el-button @click="resetQuery">重置</el-button>
@@ -50,9 +44,7 @@
         <el-table-column label="规则名称" prop="name" min-width="180" show-overflow-tooltip />
         <el-table-column label="级别" width="90" align="center">
           <template #default="{row}">
-            <el-tag :type="severityType(getRuleSeverity(row))" size="small">
-              {{ severityLabel(getRuleSeverity(row)) }}
-            </el-tag>
+            <el-tag :type="severityType(row.severity)" size="small">{{ severityLabel(row.severity) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="PromQL" prop="prom_ql" min-width="220" show-overflow-tooltip>
@@ -109,11 +101,11 @@
             <el-radio-button :label="3"><span style="color:#409eff">P3 警告</span></el-radio-button>
           </el-radio-group>
         </el-form-item>
-        <el-form-item label="数据源" prop="datasource_id">
-          <el-select v-model="form.datasource_id" placeholder="选择数据源" style="width:100%" clearable>
+        <el-form-item label="数据源">
+          <el-select v-model="form.datasource_ids" multiple placeholder="选择数据源" style="width:100%">
             <el-option v-for="ds in datasources" :key="ds.id" :label="ds.name" :value="ds.id" />
           </el-select>
-          <div style="font-size:11px;color:#909399;margin-top:3px">选择该规则关联的 Prometheus 数据源（N9e 当前有两个数据源可选）</div>
+          <div style="font-size:11px;color:#909399;margin-top:3px">选择该规则关联的 Prometheus 数据源</div>
         </el-form-item>
         <el-form-item label="PromQL" prop="prom_ql">
           <el-input v-model="form.prom_ql" type="textarea" :rows="3" placeholder="如：up == 0" />
@@ -142,13 +134,6 @@
         <el-form-item label="告警注释">
           <el-input v-model="form.annotations.summary" type="textarea" :rows="2" placeholder="告警描述，支持 $labels.xxx 变量" />
         </el-form-item>
-
-        <el-form-item label="通知规则">
-          <el-select v-model="form.notify_rule_ids" multiple filterable style="width:100%" placeholder="请选择通知规则">
-            <el-option v-for="n in notifyRuleOptions" :key="n.id" :label="n.name" :value="n.id" />
-          </el-select>
-        </el-form-item>
-
         <el-form-item label="恢复通知">
           <el-switch v-model="form.notify_recovered" :active-value="1" :inactive-value="0" active-text="开" inactive-text="关" />
           <span style="font-size:11px;color:#909399;margin-left:8px">告警恢复时是否发送通知</span>
@@ -157,19 +142,6 @@
           <el-input-number v-model="form.notify_repeat_step" :min="0" :step="60" style="width:160px" />
           <span style="font-size:11px;color:#909399;margin-left:8px">重复通知间隔，0表示不重复</span>
         </el-form-item>
-
-        <el-form-item label="留观时长(s)">
-          <el-input-number v-model="form.recover_duration" :min="0" :step="10" style="width:160px" />
-          <span style="font-size:11px;color:#909399;margin-left:8px">持续多少秒没有触发告警阈值才算恢复</span>
-        </el-form-item>
-        
-        <el-form-item label="最大通知次数">
-          <el-input-number v-model="form.notify_max_number" :min="0" :step="1" style="width:160px" />
-          <span style="font-size:11px;color:#909399;margin-left:8px">最多通知几次</span>
-        </el-form-item>
-            
-
-
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
@@ -203,7 +175,7 @@ import {
   listAlertRules, createAlertRule, updateAlertRule,
   deleteAlertRules, updateAlertRuleStatus,
   getN9eConfig, updateN9eConfig,
-  listDatasources, listNotifyRules 
+  listDatasources  // 添加这行
 } from '@/api/monitor/n9e'
 
 export default {
@@ -215,9 +187,8 @@ export default {
       tableData: [],
       datasources: [],  // 数据源列表
       total: 0,
-      queryParams: { p: 0, limit: 20, query: '', severity: '', datasourceId: '' },
+      queryParams: { p: 0, limit: 20, query: '', severity: '' },
       dialogVisible: false,
-      notifyRuleOptions: [],
       form: this.defaultForm(),
       rules: {
         name: [{ required: true, message: '请输入规则名称', trigger: 'blur' }],
@@ -240,7 +211,6 @@ export default {
     this.fetchConfig()
     this.fetchDatasources()  // 添加这行
     this.fetchList()
-    this.fetchNotifyRules()
   },
   methods: {
     defaultForm() {
@@ -249,10 +219,7 @@ export default {
         prom_for_duration: 60, prom_eval_interval: 15,
         append_tags: [], annotations: { summary: '' },
         notify_recovered: 1, notify_repeat_step: 0, disabled: 0,
-        notify_rule_ids: [],
-        recover_duration: 60,      // 新增
-        notify_max_number: 2,      // 新增
-        datasource_id: 1
+        datasource_ids: [1]  // 添加这行，默认选择 ID=1 的数据源
       }
     },
     async fetchList() {
@@ -269,17 +236,11 @@ export default {
           const kw = this.queryParams.query.toLowerCase()
           list = list.filter(r => r.name && r.name.toLowerCase().includes(kw))
         }
-        // 前端 datasource 过滤
-        if (this.queryParams.datasourceId !== '' && this.queryParams.datasourceId !== null && this.queryParams.datasourceId !== undefined) {
-          const selected = Number(this.queryParams.datasourceId)
-          list = list.filter(r => {
-            const val = Number(r.datasource_value)
-            if (!Number.isNaN(val) && val > 0) return val === selected
-            const ids = Array.isArray(r.datasource_ids) ? r.datasource_ids.map(Number) : []
-            return ids.includes(selected)
-          })
+        // 前端 severity 过滤
+        if (this.queryParams.severity !== '') {
+          list = list.filter(r => r.severity === this.queryParams.severity)
         }
-
+    
         this.tableData = list
         this.total = list.length
       } catch (e) {
@@ -310,25 +271,8 @@ export default {
         console.warn('获取数据源失败', e)
       }
     },
-    async fetchNotifyRules() {
-      try {
-        const res = await listNotifyRules({ p: 1, limit: 500 })
-        const dat = res?.data?.dat ?? res?.dat ?? []
-        this.notifyRuleOptions = Array.isArray(dat) ? dat : (dat?.list || [])
-      } catch (e) {
-        this.notifyRuleOptions = []
-      }
-    },
-
-    getRuleSeverity(row) {
-      const qSeverity = row?.rule_config?.queries?.[0]?.severity
-      const s = qSeverity ?? row?.severity
-      const n = Number(s)
-      return [1, 2, 3].includes(n) ? n : 3
-    },
-
     resetQuery() {
-      this.queryParams = { p: 0, limit: 20, query: '', severity: '', datasourceId: '' }
+      this.queryParams = { p: 0, limit: 20, query: '', severity: '' }
       this.fetchList()
     },
     handleSizeChange(size) { this.queryParams.limit = size; this.queryParams.p = 0; this.fetchList() },
@@ -341,19 +285,11 @@ export default {
       this.form = {
         ...this.defaultForm(),
         ...row,
-        severity: this.getRuleSeverity(row),
-        recover_duration: Number(row.recover_duration ?? 60),
-        notify_max_number: Number(row.notify_max_number ?? 2),
-        notify_rule_ids: Array.isArray(row.notify_rule_ids) ? [...row.notify_rule_ids] : [],
         prom_ql: promQl,  // 覆盖为正确的值
         append_tags: Array.isArray(row.append_tags) ? [...row.append_tags] : [],
-        datasource_id: Number(
-          row.datasource_value
-          || row.datasource_id
-          || (Array.isArray(row.datasource_ids) && row.datasource_ids[0])
-          || (Array.isArray(row.datasource_queries) && row.datasource_queries[0] && Array.isArray(row.datasource_queries[0].values) && row.datasource_queries[0].values[0])
-          || 1
-        ),
+        datasource_ids: Array.isArray(row.datasource_ids) && row.datasource_ids.length > 0
+          ? [...row.datasource_ids]
+          : [1],
         annotations: row.annotations && typeof row.annotations === 'object' ? { ...row.annotations } : { summary: row.annotations || '' }
       }
       this.dialogVisible = true
@@ -380,10 +316,7 @@ export default {
             severity: this.form.severity,
             prom_for_duration: this.form.prom_for_duration,
             prom_eval_interval: this.form.prom_eval_interval,
-            recover_duration: this.form.recover_duration,
-            notify_max_number: this.form.notify_max_number,
             append_tags: this.form.append_tags.filter(t => t.trim()),
-            notify_rule_ids: this.form.notify_rule_ids || [],
             annotations,
             notify_recovered: this.form.notify_recovered,
             notify_repeat_step: this.form.notify_repeat_step,
@@ -392,8 +325,12 @@ export default {
             group_id: this.form.group_id || 1,
             cate: this.form.cate || 'prometheus',
             prod: this.form.prod || 'metric',
-            datasource_queries: [{ match_type: 0, op: 'in', values: [Number(this.form.datasource_id || 1)] }],
-            datasource_value: Number(this.form.datasource_id || 1),
+            datasource_queries: (this.form.datasource_ids && this.form.datasource_ids.length > 0
+              ? this.form.datasource_ids
+              : [1]).map(id => ({ match_type: 0, op: 'in', values: [id] })),
+            datasource_value: (this.form.datasource_ids && this.form.datasource_ids.length > 0)
+              ? this.form.datasource_ids[0]
+              : 1,
             rule_config: {
               inhibit: false,
               queries: [{
@@ -417,8 +354,7 @@ export default {
           this.dialogVisible = false
           this.fetchList()
         } catch (e) {
-          const msg = e?.response?.data?.msg || e?.message || '请检查 N9e 连接'
-          this.$message.error('保存失败：' + msg)
+          this.$message.error('保存失败：' + (e.message || '请检查 N9e 连接'))
         } finally {
           this.submitting = false
         }

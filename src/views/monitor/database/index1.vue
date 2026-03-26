@@ -137,68 +137,41 @@
               </el-descriptions>
             </el-card>
 
-            <!-- 告警指南 & 生成PromQL (多指标重构版 + 收起/展开功能) -->
+            <!-- ================= 告警指南 ================= -->
             <el-card shadow="never" class="mb20">
-              <template #header>MySQL告警指南</template>
+              <template #header>
+                MySQL 告警指南
+                <el-tooltip content="下面的PromQL语句可用于告警规则设置" placement="top">
+                  <el-button type="text" icon="el-icon-info" circle style="margin-left:8px;"></el-button>
+                </el-tooltip>
+              </template>
 
-              <!-- 全局时间窗口选择器 -->
-              <div class="global-range-selector">
-                <span class="range-label">全局时间窗口 (rate区间):</span>
-                <el-select v-model="globalRange" placeholder="请选择" style="width: 120px">
-                  <el-option label="1分钟" value="1m" />
-                  <el-option label="5分钟" value="5m" />
-                  <el-option label="10分钟" value="10m" />
-                  <el-option label="1小时" value="1h" />
-                </el-select>
-              </div>
+              <el-form :inline="true" label-width="60px" style="margin-bottom: 10px;">
+                <el-form-item label="时间窗口">
+                  <el-select v-model="timeWindow" placeholder="选择时间窗口" style="width:100px;">
+                    <el-option v-for="t in timeOptions" :key="t" :label="t" :value="t"/>
+                  </el-select>
+                </el-form-item>
+                <el-form-item label="阈值">
+                  <el-input v-model="threshold" style="width:80px;" placeholder="请输入阈值"/>
+                </el-form-item>
+                <el-form-item>
+                  <el-button type="primary" @click="generatePromql">生成</el-button>
+                </el-form-item>
+              </el-form>
 
-              <!-- 遍历所有告警指标，每个指标独立阈值和生成按钮 -->
-              <div
-                v-for="alarm in alarmList"
-                :key="alarm.key"
-                class="alarm-item"
-              >
-                <div class="alarm-header">
-                  <span class="alarm-name">{{ alarm.name }}</span>
-                  <span class="alarm-desc">{{ alarm.desc }}</span>
-                </div>
-
-                <div class="alarm-controls">
-                  <div class="threshold-control">
-                    <span>阈值：</span>
-                    <el-input-number
-                      v-model="alarmThresholds[alarm.key]"
-                      :min="0"
-                      :step="alarm.step || 1"
-                      :precision="alarm.precision || 0"
-                      size="small"
-                      style="width: 120px"
-                    />
-                    <span class="threshold-unit">{{ alarm.unit }}</span>
-                  </div>
-                  <el-button
-                    type="primary"
-                    size="small"
-                    @click="generateForAlarm(alarm.key)"
-                  >
-                    生成 PromQL
-                  </el-button>
-                </div>
-
-                <!-- PromQL 显示区域，支持收起/展开 -->
-                <div v-if="showPromqlMap[alarm.key]" class="generated-promql">
-                  <div class="promql-header">
-                    <span>生成的 PromQL 语句</span>
-                    <el-button type="text" size="small" @click="hidePromql(alarm.key)">
-                      收起
-                    </el-button>
-                  </div>
-                  <pre>{{ generatedPromqlMap[alarm.key] }}</pre>
-                </div>
+              <div v-for="alarm in alarmList" :key="alarm.name" style="margin-bottom:15px;">
+                <div style="font-weight:bold;">{{ alarm.name }}（阈值：{{ threshold }}）</div>
+                <el-input
+                  type="textarea"
+                  :rows="6"
+                  :model-value="alarm.generatedPromql || alarm.template"
+                  readonly
+                />
               </div>
             </el-card>
 
-            <!-- 面板区域（完全保留你的原结构） -->
+            <!-- ================= 面板区域（保持原来） ================= -->
             <el-card shadow="never">
               <div
                 v-for="dim in dimensionList"
@@ -262,7 +235,7 @@ const dbInfo = reactive({
 const grafanaBaseUrl =
   "http://192.168.31.34:32556/d-solo/549c2bf8936f7767ea6ac47c47b00f2a/mysql-exporter-quickstart-and-dashboard"
 
-/* 维度（完全保留你的原始定义） */
+/* 维度 */
 const dimensionList = ref([
   { key: "basic", name: "基础资源" },
   { key: "db", name: "数据库性能" },
@@ -271,7 +244,7 @@ const dimensionList = ref([
   { key: "replication", name: "复制延迟" }
 ])
 
-/* 面板（完全保留你的原始 panelGroup） */
+/* 面板 */
 const panelGroup = {
   basic: [
     { id: 12, name: "运行时长 " },
@@ -303,18 +276,15 @@ const panelGroup = {
   ]
 }
 
-/* 锚点 */
-const sectionRefs = reactive({})
-const rightContainer = ref(null)
-
 /* 概览统计 */
 const totalDb = ref(0)
 const normalDb = ref(0)
 const abnormalDb = ref(0)
-
 const currentStatus = computed(() => dbInfo.status)
 
 /* 滚动 */
+const sectionRefs = reactive({})
+const rightContainer = ref(null)
 function scrollToSection(key) {
   const container = rightContainer.value
   const el = sectionRefs[key]
@@ -324,7 +294,7 @@ function scrollToSection(key) {
   }
 }
 
-/* panel宽度（保留你的逻辑） */
+/* panel宽度 */
 function getPanelSpan(dimKey, panelId) {
   if (dimKey === "basic") {
     if (panelId === 12) return 8
@@ -348,72 +318,14 @@ const getGrafanaUrl = (panelId) => {
   return `${grafanaBaseUrl}?${params.toString()}`
 }
 
-/* 点击数据库 */
-function handleNodeClick(data) {
-  if (data.children) return
+/* PromQL告警生成 */
+const timeOptions = ["1m", "5m", "10m", "1h"]
+const timeWindow = ref("1m")
+const threshold = ref(80)
 
-  if (data.status === 1) {
-    ElMessage.warning("该实例已禁用")
-    return
-  }
-
-  dbInfo.type = data.type
-  dbInfo.name = data.label
-  dbInfo.ip = data.ip
-  dbInfo.port = data.port
-  dbInfo.version = data.version
-  dbInfo.user = data.user
-  dbInfo.job = data.job
-  dbInfo.status = data.status
-}
-
-/* 获取树 + 统计 */
-function getDbTree() {
-  listDatabase().then(res => {
-    const list = res.rows || []
-
-    totalDb.value = list.length
-    normalDb.value = list.filter(i => i.status === 0).length
-    abnormalDb.value = list.filter(i => i.status === 1).length
-
-    const children = list.map(item => ({
-      id: item.databaseId,
-      label: item.databaseName,
-      ip: item.ipAddress,
-      port: item.port,
-      type: item.deviceId === 7 ? "MySQL" : "未知",
-      version: item.version,
-      user: item.username,
-      job: item.username,
-      status: item.status
-    }))
-
-    dbTree.value = [{ id: 1, label: "数据库", children }]
-  })
-}
-
-/* ===================== 多指标告警生成逻辑（重构版 + 收起/展开） ===================== */
-// 全局时间窗口（供所有rate类告警使用）
-const globalRange = ref("1m")
-
-// 存储每个告警的阈值（动态）
-const alarmThresholds = reactive({})
-// 存储每个告警生成的最终PromQL语句
-const generatedPromqlMap = reactive({})
-// 控制每个告警的PromQL区域是否显示
-const showPromqlMap = reactive({})
-
-// 告警指标定义（包含名称、描述、默认阈值、单位、模板、步长等）
 const alarmList = ref([
   {
-    key: "buffer_hit",
     name: "缓存利用率",
-    desc: "缓存占用过高，可能存在内存瓶颈",
-    defaultThreshold: 80,
-    unit: "%",
-    step: 1,
-    precision: 0,
-    // 该模板不依赖时间窗口，只做 job/instance 替换
     template: `(
   (
     (
@@ -439,125 +351,63 @@ const alarmList = ref([
     mysql_global_variables_query_cache_size{job=~"$job", instance=~"$instance"}
   )
   * 100
-)`,
-    // 是否需要替换时间窗口占位符
-    needRangeReplace: false
-  },
-  {
-    key: "lock_wait_ratio",
-    name: "锁等待比例",
-    desc: "表锁等待比例过高，可能存在锁争用",
-    defaultThreshold: 10,
-    unit: "%",
-    step: 1,
-    precision: 1,
-    template: `(
-  sum(rate(mysql_global_status_table_locks_waited{job=~"$job", instance=~"$instance"}[$range]))
-  /
-  (
-    sum(rate(mysql_global_status_table_locks_immediate{job=~"$job", instance=~"$instance"}[$range]))
-    +
-    sum(rate(mysql_global_status_table_locks_waited{job=~"$job", instance=~"$instance"}[$range]))
-  )
-  * 100
-)`,
-    needRangeReplace: true
-  },
-  {
-    key: "slow_queries",
-    name: "慢查询数量",
-    desc: "慢查询频率过高，需检查SQL性能",
-    defaultThreshold: 5,
-    unit: "次/秒",
-    step: 0.1,
-    precision: 1,
-    template: `sum(rate(mysql_global_status_slow_queries{job=~"$job", instance=~"$instance"}[$range]))`,
-    needRangeReplace: true
-  },
-  {
-    key: "connection_usage",
-    name: "连接池使用率",
-    desc: "连接数占用过高，可能耗尽连接",
-    defaultThreshold: 85,
-    unit: "%",
-    step: 1,
-    precision: 0,
-    template: `(
-  sum(mysql_global_status_threads_connected{job=~"$job", instance=~"$instance"})
-  /
-  sum(mysql_global_variables_max_connections{job=~"$job", instance=~"$instance"})
-) * 100`,
-    needRangeReplace: false
-  },
-  {
-    key: "qps",
-    name: "QPS过高",
-    desc: "每秒查询数过高，超出系统承载能力",
-    defaultThreshold: 100,
-    unit: "次/秒",
-    step: 10,
-    precision: 0,
-    template: `rate(mysql_global_status_queries{job=~"$job", instance=~"$instance"}[$range])`,
-    needRangeReplace: true
+)`
   }
 ])
 
-// 初始化每个告警的默认阈值和显示状态
-alarmList.value.forEach(alarm => {
-  alarmThresholds[alarm.key] = alarm.defaultThreshold
-  generatedPromqlMap[alarm.key] = ""
-  showPromqlMap[alarm.key] = false  // 初始不显示
-})
-
-/**
- * 为单个告警生成最终的 PromQL 语句
- * @param {string} alarmKey 告警唯一标识
- */
-function generateForAlarm(alarmKey) {
-  // 校验是否已选择数据库实例
-  if (!dbInfo.name) {
-    ElMessage.warning("请先选择数据库实例")
-    return
-  }
-
-  const alarm = alarmList.value.find(a => a.key === alarmKey)
-  if (!alarm) return
-
-  // 获取当前阈值
-  const threshold = alarmThresholds[alarmKey]
-  if (threshold === undefined || threshold === null) {
-    ElMessage.warning(`${alarm.name} 阈值未设置`)
-    return
-  }
-
-  let promql = alarm.template
-
-  // 替换 job 和 instance 占位符
-  promql = promql.replace(/\$job/g, dbInfo.job)
-  promql = promql.replace(/\$instance/g, `${dbInfo.ip}:${dbInfo.port}`)
-
-  // 如果该指标需要时间窗口替换，则替换 [$range] 占位符
-  if (alarm.needRangeReplace) {
-    promql = promql.replace(/\$range/g, globalRange.value)
-  }
-
-  // 最终拼接比较条件（大于阈值）
-  const finalPromql = `${promql} > ${threshold}`
-
-  // 存储生成的语句
-  generatedPromqlMap[alarmKey] = finalPromql
-  // 生成后自动显示 PromQL 区域
-  showPromqlMap[alarmKey] = true
-
-  ElMessage.success(`${alarm.name} PromQL 生成成功`)
+function generatePromql() {
+  alarmList.value.forEach(alarm => {
+    const job = dbInfo.user
+    const instance = `${dbInfo.ip}:${dbInfo.port}`
+    const t = timeWindow.value
+    const th = threshold.value
+    alarm.generatedPromql = alarm.template
+      .replace(/\$job/g, job)
+      .replace(/\$instance/g, instance)
+      .replace(/\[.*?\]/g, `[${t}]`) 
+    if (th) {
+      alarm.generatedPromql += ` > ${th}`
+    }
+  })
 }
 
-/**
- * 隐藏指定告警的 PromQL 显示区域
- * @param {string} alarmKey
- */
-function hidePromql(alarmKey) {
-  showPromqlMap[alarmKey] = false
+/* 点击数据库 */
+function handleNodeClick(data) {
+  if (data.children) return
+  if (data.status === 1) {
+    ElMessage.warning("该实例已禁用")
+    return
+  }
+  dbInfo.type = data.type
+  dbInfo.name = data.label
+  dbInfo.ip = data.ip
+  dbInfo.port = data.port
+  dbInfo.version = data.version
+  dbInfo.user = data.user
+  dbInfo.job = data.job
+  dbInfo.status = data.status
+}
+
+/* 获取树 + 统计 */
+function getDbTree() {
+  listDatabase().then(res => {
+    const list = res.rows || []
+    totalDb.value = list.length
+    normalDb.value = list.filter(i => i.status === 0).length
+    abnormalDb.value = list.filter(i => i.status === 1).length
+    const children = list.map(item => ({
+      id: item.databaseId,
+      label: item.databaseName,
+      ip: item.ipAddress,
+      port: item.port,
+      type: item.deviceId === 7 ? "MySQL" : "未知",
+      version: item.version,
+      user: item.username,
+      job: item.username,
+      status: item.status
+    }))
+    dbTree.value = [{ id: 1, label: "数据库", children }]
+  })
 }
 
 onMounted(() => {
@@ -566,9 +416,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.mb20 {
-  margin-bottom: 20px;
-}
+.mb20 { margin-bottom: 20px; }
 
 .right-container {
   height: calc(100vh - 20px);
@@ -577,56 +425,23 @@ onMounted(() => {
 }
 
 /* tree */
-.tree-node {
-  display: flex;
-  justify-content: space-between;
-  width: 100%;
-}
-
-/* 状态点 */
-.status-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-}
-.status-online {
-  background: #52c41a;
-}
-.status-offline {
-  background: #999999; /* 改成灰色 */
-}
+.tree-node { display: flex; justify-content: space-between; width: 100%; }
+.status-dot { width: 10px; height: 10px; border-radius: 50%; }
+.status-online { background: #52c41a; }
+.status-offline { background: #c0c4cc; }
 
 /* 概览 */
-.overview-title {
-  font-size: 14px;
-  color: #666;
-}
-.overview-value {
-  font-size: 22px;
-  font-weight: bold;
-  margin-top: 10px;
-}
-.success {
-  color: #52c41a;
-}
-.danger {
-  color: #ff4d4f;
-}
+.overview-title { font-size: 14px; color: #666; }
+.overview-value { font-size: 22px; font-weight: bold; margin-top: 10px; }
+.success { color: #52c41a; }
+.danger { color: #ff4d4f; }
 
 /* 维度 */
-.dim-item {
-  padding: 8px;
-  cursor: pointer;
-}
-.dim-item:hover {
-  background: #f5f7fa;
-}
+.dim-item { padding: 8px; cursor: pointer; }
+.dim-item:hover { background: #f5f7fa; }
 
 /* 面板 */
-.dimension-section {
-  margin-bottom: 30px;
-}
-
+.dimension-section { margin-bottom: 30px; }
 .section-title {
   font-size: 18px;
   font-weight: bold;
@@ -634,111 +449,15 @@ onMounted(() => {
   border-left: 4px solid #409eff;
   padding-left: 8px;
 }
-
 .iframe-container {
   border: 1px solid #ebeef5;
   border-radius: 6px;
   overflow: hidden;
 }
-
 .iframe-header {
   background: #f8fafc;
   padding: 8px;
   font-weight: bold;
   border-bottom: 1px solid #ebeef5;
-}
-
-/* 告警生成 (多指标样式) */
-.global-range-selector {
-  margin-bottom: 20px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
-  background: #f9fafc;
-  border-radius: 6px;
-  border: 1px solid #e4e7ed;
-}
-.range-label {
-  font-weight: 500;
-  color: #1f2f3d;
-}
-
-.alarm-item {
-  border: 1px solid #e9eef3;
-  border-radius: 8px;
-  margin-bottom: 20px;
-  padding: 16px;
-  background: #ffffff;
-  transition: all 0.2s;
-}
-.alarm-item:hover {
-  box-shadow: 0 2px 12px 0 rgba(0,0,0,0.05);
-  border-color: #d0d7de;
-}
-
-.alarm-header {
-  margin-bottom: 12px;
-  border-left: 3px solid #409eff;
-  padding-left: 12px;
-}
-.alarm-name {
-  font-size: 16px;
-  font-weight: bold;
-  color: #303133;
-  margin-right: 12px;
-}
-.alarm-desc {
-  font-size: 12px;
-  color: #909399;
-}
-
-.alarm-controls {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  flex-wrap: wrap;
-  margin-bottom: 12px;
-}
-.threshold-control {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: #5a5e66;
-}
-.threshold-unit {
-  margin-left: 4px;
-  color: #909399;
-}
-
-.generated-promql {
-  margin-top: 12px;
-  background: #f5f7fa;
-  border-radius: 6px;
-  border: 1px solid #e6e9f0;
-  overflow: hidden;
-}
-.promql-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 12px;
-  background: #eef2f6;
-  border-bottom: 1px solid #e2e6ec;
-  font-size: 13px;
-  font-weight: 500;
-  color: #2c3e50;
-}
-.generated-promql pre {
-  margin: 0;
-  padding: 12px;
-  white-space: pre-wrap;
-  word-break: break-all;
-  font-family: 'Courier New', monospace;
-  font-size: 12px;
-  color: #2c3e50;
-  line-height: 1.5;
-  background: #f5f7fa;
 }
 </style>

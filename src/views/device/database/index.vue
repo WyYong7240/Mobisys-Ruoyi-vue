@@ -98,7 +98,7 @@
 
         <el-table v-loading="loading" :data="databaseList" @selection-change="handleSelectionChange">
           <el-table-column type="selection" width="55" align="center" />
-          <el-table-column label="数据库id" align="center" prop="databaseId" />
+          <el-table-column label="数据库实例ID" align="center" prop="databaseId" />
           <el-table-column label="设备类型" align="center" prop="deviceId">
             <template #default="scope">
               {{ getDeviceName(scope.row.deviceId) }}
@@ -112,7 +112,7 @@
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="数据库ip地址" align="center" prop="ipAddress" />
+          <el-table-column label="数据库实例IP地址" align="center" prop="ipAddress" />
           <el-table-column label="端口号" align="center" prop="port" />
           <el-table-column label="数据库用户名" align="center" prop="username" />
           <el-table-column label="负责人" align="center" prop="leader" />
@@ -295,7 +295,7 @@ export default {
         console.log('构建后的树状图数据:', this.deviceTree)
         // 只保留"数据库设备"这个根节点
         if (this.deviceTree && this.deviceTree.length > 0) {
-          const databaseDeviceNode = this.deviceTree.find(node => node.deviceName === '数据库')
+          const databaseDeviceNode = this.deviceTree.find(node => node.deviceName === '数据库种类')
           if (databaseDeviceNode) {
             this.deviceTree = [databaseDeviceNode]
             console.log('过滤后的树状图数据:', this.deviceTree)

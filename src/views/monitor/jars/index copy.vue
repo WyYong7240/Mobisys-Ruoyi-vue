@@ -130,129 +130,8 @@
       </el-card>
     </transition>
 
-    <div class="monitor-sections">
-    <el-card shadow="never" class="trace-query-card" :style="{ order: traceGroupSortOrder + 1 }">
-      <template #header>
-        <div class="trace-card-header">
-          <div class="trace-title">
-            <i class="el-icon-share"></i>
-            <span>接口调用查询</span>
-            <el-tooltip content="默认位于第3个模块（分组序号=2），用于快速定位慢接口和异常Trace" placement="top">
-              <i class="el-icon-info" style="margin-left:6px;color:#909399;cursor:pointer;" />
-            </el-tooltip>
-          </div>
 
-          <el-tooltip content="配置 Jaeger Query 地址，影响本面板的数据来源" placement="top">
-            <el-button size="mini" type="primary" plain @click="openTraceConfigDialog">Jaeger配置</el-button>
-          </el-tooltip>
-        </div>
-      </template>
-
-      <el-form :inline="true" size="small" class="trace-filter-form">
-        <el-form-item label="服务">
-          <el-tooltip content="默认取当前应用，可切换到其他服务" placement="top">
-            <el-select v-model="traceQuery.service" style="width:180px" placeholder="请选择服务">
-              <el-option v-for="service in traceServiceOptions" :key="service" :label="service" :value="service" />
-            </el-select>
-          </el-tooltip>
-        </el-form-item>
-        <el-form-item label="接口">
-          <el-tooltip content="自动识别接口列表；不选则查询全部接口" placement="top">
-            <el-select v-model="traceQuery.endpoint" style="width:240px" placeholder="全部接口（自动识别）" clearable>
-              <el-option label="全部接口" value="" />
-              <el-option v-for="ep in traceEndpointOptions" :key="ep" :label="ep" :value="ep" />
-            </el-select>
-          </el-tooltip>
-        </el-form-item>
-        <el-form-item label="最近时间">
-          <el-tooltip content="建议先用最近30分钟，问题复现时再缩小到最近5分钟" placement="top">
-            <el-select v-model="traceQuery.recent" style="width:160px">
-              <el-option label="最近5分钟" value="5m" />
-              <el-option label="最近15分钟" value="15m" />
-              <el-option label="最近30分钟" value="30m" />
-              <el-option label="最近1小时" value="1h" />
-              <el-option label="最近3小时" value="3h" />
-              <el-option label="最近6小时" value="6h" />
-              <el-option label="最近12小时" value="12h" />
-              <el-option label="最近24小时" value="24h" />
-            </el-select>
-          </el-tooltip>
-        </el-form-item>
-        <el-form-item label="条数">
-          <el-tooltip content="默认100条；条数越大查询越慢" placement="top">
-            <el-input-number v-model="traceQuery.limit" :min="10" :max="200" :step="10" style="width:120px" />
-          </el-tooltip>
-        </el-form-item>
-        <el-form-item label="总耗时(ms)">
-          <el-tooltip content="按总耗时区间筛选，留空表示不限制" placement="top">
-            <div style="display:flex;align-items:center;gap:6px;">
-              <el-input-number v-model="traceQuery.minDurationMs" :min="0" :step="10" style="width:110px" placeholder="最小" />
-              <span style="color:#909399;">-</span>
-              <el-input-number v-model="traceQuery.maxDurationMs" :min="0" :step="10" style="width:110px" placeholder="最大" />
-            </div>
-          </el-tooltip>
-        </el-form-item>
-        <el-form-item label="分组序号">
-          <el-tooltip content="与下方大面板排序规则一致：0最靠前，2表示第3个位置" placement="top">
-            <el-input-number v-model="traceGroupSortOrder" :min="0" :max="999" :step="1" style="width:120px" />
-          </el-tooltip>
-        </el-form-item>
-        <el-form-item>
-          <el-tooltip content="按当前筛选条件查询调用链，默认最近30分钟+100条" placement="top">
-            <el-button type="primary" :loading="traceLoading" @click="handleTraceQuery">查询追踪</el-button>
-          </el-tooltip>
-        </el-form-item>
-      </el-form>
-
-      <div v-if="traceSummary" class="trace-summary-row">
-        <div class="trace-stat-card stat-max">
-          <div class="trace-stat-label">Max</div>
-          <div class="trace-stat-value">{{ traceSummary.max }} ms</div>
-        </div>
-        <div class="trace-stat-card stat-avg">
-          <div class="trace-stat-label">Avg</div>
-          <div class="trace-stat-value">{{ traceSummary.avg }} ms</div>
-        </div>
-        <div class="trace-stat-card stat-p99">
-          <div class="trace-stat-label">P99</div>
-          <div class="trace-stat-value">{{ traceSummary.p99 }} ms</div>
-        </div>
-      </div>
-
-      <el-row :gutter="12" class="trace-content-row" v-if="traceTableData.length">
-        <el-col :span="24">
-          <el-card shadow="never" class="trace-inner-card">
-            <template #header>
-              <div class="trace-inner-title">调用明细</div>
-            </template>
-            <el-table :data="traceTableData" size="small" height="300" border>
-              <el-table-column label="接口" prop="endpoint" min-width="150" show-overflow-tooltip />
-              <el-table-column label="开始时间" prop="startTime" min-width="150" />
-              <el-table-column label="总耗时(ms)" prop="durationMs" width="105" align="right" />
-              <el-table-column label="业务处理(ms)" prop="businessMs" width="110" align="right" />
-              <el-table-column label="数据库(ms)" prop="dbMs" width="100" align="right" />
-              <el-table-column label="状态" prop="status" width="80" align="center">
-                <template #default="scope">
-                  <el-tag size="mini" :type="scope.row.status === 'SUCCESS' ? 'success' : 'danger'">
-                    {{ scope.row.status }}
-                  </el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column label="操作" width="180" align="center" fixed="right">
-                <template #default="scope">
-                  <el-button type="primary" link size="small" @click="openTraceDetail(scope.row)">查看调用各部分具体耗时</el-button>
-                </template>
-              </el-table-column>
-            </el-table>
-          </el-card>
-        </el-col>
-      </el-row>
-
-      <el-empty v-else description="请选择条件后查询接口调用追踪" :image-size="72" />
-    </el-card>
-
-
-    <div v-for="(group, groupIdx) in panelGroups" :key="group.name" class="panel-group-block" :style="{ order: (group.groupSortOrder || 0) + 1 }">
+    <div v-for="(group, groupIdx) in panelGroups" :key="group.name" class="panel-group-block">
       <el-card shadow="never" class="panel-group-card">
         <template #header>
           <div class="panel-group-header">
@@ -308,23 +187,8 @@
       <p>暂无监控面板，请先选择具体应用或添加自定义指标</p>
     </div>
 
-    </div><!-- /monitor-sections -->
-
       </div><!-- /jars-main -->
     </div><!-- /jars-body -->
-
-    <!-- Jaeger 配置 -->
-    <el-dialog title="Jaeger 地址配置" v-model="traceConfigDialogVisible" width="520px">
-      <el-form label-width="100px" size="small">
-        <el-form-item label="Jaeger地址">
-          <el-input v-model="traceConfig.baseUrl" placeholder="如：http://192.168.31.34:32686" clearable />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="traceConfigDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="traceConfigSaving" @click="saveTraceConfig">保存</el-button>
-      </template>
-    </el-dialog>
 
     <!-- METRIC DIALOG -->
     <el-dialog :title="metricForm.id ? '编辑自定义指标' : '新增自定义指标'" v-model="metricDialogVisible" width="660px" @close="resetMetricForm">
@@ -379,7 +243,6 @@
             <el-option label="仪表盘" value="gauge"></el-option>
             <el-option label="柱状图" value="barchart"></el-option>
             <el-option label="bar gauge LCD" value="bar gauge LCD"></el-option>
-            <el-option label="饼图" value="piechart"></el-option>
             <el-option label="表格" value="table"></el-option>
           </el-select>
         </el-form-item>
@@ -448,7 +311,7 @@
 </template>
 
 <script>
-import { listJarsApps, listJarsPanelConfig, saveJarsPanelConfig, delJarsPanelConfig, batchSortJarsPanels, queryJarsTrace, getJarsTraceConfig, updateJarsTraceConfig } from '@/api/monitor/jars'
+import { listJarsApps, listJarsPanelConfig, saveJarsPanelConfig, delJarsPanelConfig, batchSortJarsPanels } from '@/api/monitor/jars'
 
 export default {
   name: 'JarsMonitor',
@@ -498,26 +361,7 @@ export default {
       metricRules: {
         name:   [{ required: true, message: '请输入指标名称', trigger: 'blur' }],
         promql: [{ required: true, message: '请输入Prometheus查询语句', trigger: 'blur' }]
-      },
-      traceLoading: false,
-      traceConfigDialogVisible: false,
-      traceConfigSaving: false,
-      traceConfig: {
-        baseUrl: 'http://192.168.31.34:32686'
-      },
-      traceGroupSortOrder: 2,
-      traceQuery: {
-        service: '',
-        endpoint: '',
-        recent: '30m',
-        limit: 100,
-        minDurationMs: null,
-        maxDurationMs: null
-      },
-      traceTrend: [],
-      traceAllTableData: [],
-      traceTableData: [],
-      traceEndpointOptions: []
+      }
     }
   },
 
@@ -587,24 +431,10 @@ export default {
         categories: Object.values(d.categories)
       }))
     },
-    traceServiceOptions() {
-      return this.appOptions.map(item => item.appName)
-    },
-    traceSummary() {
-      if (!this.traceTableData.length) return null
-      const durations = this.traceTableData.map(item => item.durationMs)
-      const sorted = [...durations].sort((a, b) => a - b)
-      const max = sorted[sorted.length - 1]
-      const avg = Math.round(durations.reduce((acc, cur) => acc + cur, 0) / durations.length)
-      const p99Index = Math.max(0, Math.ceil(sorted.length * 0.99) - 1)
-      const p99 = sorted[p99Index]
-      return { max, avg, p99 }
-    },
   },
 
   created() {
     this.loadApps()
-    this.loadTraceConfig()
   },
 
   watch: {
@@ -619,12 +449,8 @@ export default {
     'queryParams.device'() {
       this.refreshKey++
     },
-    'queryParams.appName'(val) {
+    'queryParams.appName'() {
       this.refreshKey++
-      if (val && val !== 'All') this.traceQuery.service = val
-    },
-    'traceQuery.endpoint'() {
-      this.applyTraceEndpointFilter()
     }
   },
 
@@ -661,9 +487,7 @@ export default {
         if (this.categoryOptions.length > 0) this.queryParams.category = this.categoryOptions[0]
         if (this.appOptions.length > 0) {
           this.queryParams.appName = this.appOptions[0].appName
-          this.traceQuery.service = this.queryParams.appName
           await this.loadSavedConfig()
-          await this.handleTraceQuery()
         }
       } catch (e) {
         console.warn('Jars应用管理接口异常', e)
@@ -702,158 +526,6 @@ export default {
       this.$message.success('数据已刷新')
     },
 
-    async loadTraceConfig() {
-      try {
-        const res = await getJarsTraceConfig()
-        const cfg = res?.data || {}
-        if (cfg.baseUrl) this.traceConfig.baseUrl = cfg.baseUrl
-      } catch (e) {
-        this.$message.warning('加载Jaeger配置失败')
-      }
-    },
-
-    openTraceConfigDialog() {
-      this.traceConfigDialogVisible = true
-    },
-
-    async saveTraceConfig() {
-      if (!this.traceConfig.baseUrl) {
-        this.$message.warning('请输入Jaeger地址')
-        return
-      }
-      this.traceConfigSaving = true
-      try {
-        await updateJarsTraceConfig({ baseUrl: this.traceConfig.baseUrl })
-        this.$message.success('Jaeger地址已保存')
-        this.traceConfigDialogVisible = false
-      } catch (e) {
-        this.$message.error('保存Jaeger地址失败')
-      } finally {
-        this.traceConfigSaving = false
-      }
-    },
-
-    formatDateTime(date) {
-      const pad = (num) => String(num).padStart(2, '0')
-      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
-    },
-
-    getRangeByRecent(recent) {
-      const now = new Date()
-      const map = {
-        '5m': 5 * 60 * 1000,
-        '15m': 15 * 60 * 1000,
-        '30m': 30 * 60 * 1000,
-        '1h': 60 * 60 * 1000,
-        '3h': 3 * 60 * 60 * 1000,
-        '6h': 6 * 60 * 60 * 1000,
-        '12h': 12 * 60 * 60 * 1000,
-        '24h': 24 * 60 * 60 * 1000
-      }
-      const span = map[recent] || map['30m']
-      const start = new Date(now.getTime() - span)
-      return {
-        startTime: this.formatDateTime(start),
-        endTime: this.formatDateTime(now)
-      }
-    },
-
-    buildTrendPoints(key) {
-      if (!this.traceTrend.length) return ''
-      const maxValue = Math.max(...this.traceTrend.map(item => item.p99), 1)
-      const minX = 50
-      const maxX = 600
-      const minY = 30
-      const maxY = 180
-      const stepX = this.traceTrend.length > 1 ? (maxX - minX) / (this.traceTrend.length - 1) : 0
-      return this.traceTrend
-        .map((item, idx) => {
-          const value = item[key]
-          const x = minX + idx * stepX
-          const ratio = value / maxValue
-          const y = maxY - ratio * (maxY - minY)
-          return `${x},${y}`
-        })
-        .join(' ')
-    },
-
-    async handleTraceQuery() {
-      this.traceLoading = true
-      try {
-        const { startTime, endTime } = this.getRangeByRecent(this.traceQuery.recent)
-        const params = {
-          service: this.traceQuery.service || this.queryParams.appName,
-          endpoint: '',
-          startTime,
-          endTime,
-          limit: this.traceQuery.limit,
-          minDurationMs: this.traceQuery.minDurationMs,
-          maxDurationMs: this.traceQuery.maxDurationMs
-        }
-        const res = await queryJarsTrace(params)
-        const data = res?.data || {}
-        const records = Array.isArray(data.records) ? data.records : []
-        const hasMin = this.traceQuery.minDurationMs !== null && this.traceQuery.minDurationMs !== undefined && this.traceQuery.minDurationMs !== ''
-        const hasMax = this.traceQuery.maxDurationMs !== null && this.traceQuery.maxDurationMs !== undefined && this.traceQuery.maxDurationMs !== ''
-        const min = hasMin ? Number(this.traceQuery.minDurationMs) : null
-        const max = hasMax ? Number(this.traceQuery.maxDurationMs) : null
-        const filteredRecords = records.filter(item => {
-          const d = Number(item.durationMs || 0)
-          if (hasMin && d < min) return false
-          if (hasMax && d > max) return false
-          return true
-        })
-        this.traceAllTableData = filteredRecords.map(item => ({
-          traceId: item.traceId,
-          startTime: item.startTime,
-          durationMs: Number(item.durationMs || 0),
-          businessMs: Number(item.phaseCost?.['业务处理'] || 0),
-          dbMs: Number(item.phaseCost?.['数据库'] || 0),
-          status: item.status || 'SUCCESS',
-          service: item.service || params.service,
-          endpoint: item.endpoint || '-',
-          phaseCost: item.phaseCost || {}
-        }))
-
-        const endpointSet = new Set([
-          ...this.traceEndpointOptions,
-          ...this.traceAllTableData.map(item => item.endpoint).filter(Boolean)
-        ])
-        this.traceEndpointOptions = Array.from(endpointSet)
-
-        this.applyTraceEndpointFilter()
-        this.traceTrend = Array.isArray(data.trend) ? data.trend.map(item => ({
-          time: item.time,
-          avg: Number(item.avg || 0),
-          p99: Number(item.p99 || 0)
-        })) : []
-      } catch (e) {
-        this.$message.error(e?.response?.data?.msg || '调用追踪查询失败')
-      } finally {
-        this.traceLoading = false
-      }
-    },
-
-    applyTraceEndpointFilter() {
-      const ep = (this.traceQuery.endpoint || '').trim()
-      if (!ep) {
-        this.traceTableData = [...this.traceAllTableData]
-        return
-      }
-      this.traceTableData = this.traceAllTableData.filter(item => item.endpoint === ep)
-    },
-
-    openTraceDetail(row) {
-      const detailText = Object.entries(row.phaseCost)
-        .map(([name, value]) => `${name}：${value} ms`)
-        .join('<br/>')
-      this.$alert(
-        `<div style="line-height:1.9"><div><b>TraceId：</b>${row.traceId}</div><div><b>接口：</b>${row.endpoint}</div><div><b>总耗时：</b>${row.durationMs} ms</div><hr/>${detailText}</div>`,
-        '调用分段耗时',
-        { dangerouslyUseHTMLString: true }
-      )
-    },
-
     getGrafanaUrl(panel) {
       // device_ip: 当前应用的 IP 地址
       // application: process-exporter 的 groupname（即 jar 包名或进程名）
@@ -880,7 +552,7 @@ export default {
         .replace(/\$\{category\}|\$category/g, category)
         .replace(/\$\{appName\}|\$appName/g, appName)
         .replace(/\$\{unit\}|\$unit/g, unit)
-      const panelIdMap = { graph: 1, timeseries: 1, stat: 2, gauge: 3, barchart: 4, 'bar gauge LCD': 6, table: 5, piechart: 7 }
+      const panelIdMap = { graph: 1, timeseries: 1, stat: 2, gauge: 3, barchart: 4, 'bar gauge LCD': 6, table: 5 }
       const panelId = panelIdMap[panel.chartType] || 1
       const p = new URLSearchParams({
         orgId: 1, theme: 'light', panelId,
@@ -1295,33 +967,6 @@ export default {
 
 .app-info-card { margin-bottom: 12px; border-top: 3px solid #409eff; }
 .app-info-header { display: flex; align-items: center; }
-
-.trace-query-card { margin-bottom: 14px; border-top: 3px solid #6366f1; }
-.trace-card-header { display: flex; align-items: center; justify-content: space-between; }
-.trace-title { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; color: #1f2937; }
-.trace-filter-form { margin-bottom: 8px; }
-.trace-summary-row { display: grid; grid-template-columns: repeat(3, minmax(120px, 1fr)); gap: 10px; margin: 4px 0 12px; }
-.trace-stat-card { border-radius: 8px; padding: 10px 12px; border: 1px solid #e5e7eb; background: #f8fafc; }
-.trace-stat-label { font-size: 12px; color: #6b7280; margin-bottom: 4px; }
-.trace-stat-value { font-size: 22px; font-weight: 700; line-height: 1.1; }
-.trace-stat-card.stat-max .trace-stat-value { color: #ef4444; }
-.trace-stat-card.stat-avg .trace-stat-value { color: #2563eb; }
-.trace-stat-card.stat-p99 .trace-stat-value { color: #7c3aed; }
-.trace-content-row { margin-top: 2px; }
-.trace-inner-card { border: 1px solid #ebeef5; }
-.trace-inner-title { font-size: 13px; font-weight: 700; color: #374151; }
-.trace-line-wrap { height: 300px; display: flex; flex-direction: column; }
-.trace-line-legend { display: flex; gap: 16px; color: #6b7280; font-size: 12px; margin-bottom: 6px; }
-.dot { width: 8px; height: 8px; display: inline-block; border-radius: 50%; margin-right: 4px; }
-.dot-avg { background: #2563eb; }
-.dot-p99 { background: #7c3aed; }
-.trace-line-svg { flex: 1; width: 100%; background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%); border-radius: 6px; }
-.axis-line { stroke: #d1d5db; stroke-width: 1; }
-.trend-line { fill: none; stroke-width: 2.5; }
-.avg-line { stroke: #2563eb; }
-.p99-line { stroke: #7c3aed; }
-.trace-line-footer { display: flex; justify-content: space-between; font-size: 12px; color: #6b7280; margin-top: 6px; }
-
 .info-row { display: flex; align-items: baseline; margin-bottom: 8px; }
 .info-label { font-size: 12px; color: #909399; font-weight: bold; min-width: 72px; flex-shrink: 0; }
 .info-value { font-size: 13px; color: #303133; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 320px; }
@@ -1367,8 +1012,6 @@ export default {
 /* ===== Layout ===== */
 .jars-body { display: flex; align-items: flex-start; gap: 12px; }
 .jars-main { flex: 1; min-width: 0; }
-.monitor-sections { display: flex; flex-direction: column; }
-.trace-help-text { margin-top: 6px; font-size: 12px; color: #909399; }
 
 /* ===== Nav Sidebar ===== */
 .app-nav-sidebar {

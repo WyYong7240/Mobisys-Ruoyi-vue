@@ -110,10 +110,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, onErrorCaptured, nextTick, computed } from 'vue';
+import { ref, onMounted, onUnmounted, nextTick, computed } from 'vue';
 import * as echarts from 'echarts';
 import { ElMessage } from 'element-plus';
-import { listPhysicalMachines } from '@/api/system/chart';
 
 const chartRef = ref(null);
 let myChart = null;
@@ -121,9 +120,7 @@ const searchKey = ref('');
 const activeChains = ref(['service', 'deploy', 'network']);
 const selectedNode = ref(null);
 const expandedNodes = ref(new Set());
-const loading = ref(true);
-const rawNodes = ref([]);
-const rawLinks = ref([]);
+const loading = ref(true); // 仅在初次加载时展示
 
 // --- 常量配置 ---
 const NODE_TYPES = {
@@ -140,63 +137,26 @@ const COLORS = {
   network: '#00d2ff'
 };
 
-// --- 从后端获取物理机数据 ---
-const loadPhysicalMachines = () => {
-  listPhysicalMachines({}).then(response => {
-    console.log('完整响应:', response);
-    console.log('rows数据:', response.rows);
-    
-    const physicalMachines = response.rows || [];
-    console.log('物理机列表:', physicalMachines);
-    console.log('物理机数量:', physicalMachines.length);
-    
-    // 将物理机数据转换为拓扑图节点格式
-    const nodes = physicalMachines.map((pm, index) => {
-      console.log('处理物理机:', pm);
-      console.log('physicalId:', pm.physicalId, 'physicalName:', pm.physicalName);
-      
-      // 随机生成位置（暂不考虑画布坐标存储）
-      const x = 10 + (index % 5) * 20 + (Math.random() * 5);
-      const y = 20 + (Math.random() * 40);
-      
-      return {
-        id: 'pm_' + pm.physicalId,
-        name: pm.physicalName || '物理机-' + pm.physicalId,
-        type: 'pm',
-        x: x,
-        y: y,
-        fixed: true,
-        physicalData: pm
-      };
-    });
-    
-    console.log('转换后的节点:', nodes);
-    rawNodes.value = nodes;
-    
-    // 生成物理机之间的链接（可选）
-    rawLinks.value = [];
-    for (let i = 0; i < nodes.length - 1; i++) {
-      rawLinks.value.push({
-        source: nodes[i].id,
-        target: nodes[i + 1].id,
-        type: 'network'
-      });
-    }
-    
-    console.log('最终节点数量:', rawNodes.value.length);
-    console.log('最终链接数量:', rawLinks.value.length);
-    
-    loading.value = false;
-    console.log('准备调用 render()');
-    render();
-    console.log('render() 调用完成');
-  }).catch(error => {
-    console.error('获取物理机数据失败:', error);
-    console.error('错误详情:', JSON.stringify(error));
-    ElMessage.error('获取物理机数据失败: ' + (error.msg || '未知错误'));
-    loading.value = false;
-  });
-};
+// --- 模拟数据 (x, y 仅为初始百分比) ---
+const rawNodes = ref([
+  { id: 'p1', name: '核心物理机-A', type: 'pm', x: 20, y: 50 },
+  { id: 'p2', name: '计算物理机-B', type: 'pm', x: 50, y: 30 },
+  { id: 'p3', name: '存储物理机-C', type: 'pm', x: 80, y: 50 },
+  
+  // 隐藏的子链路节点
+  { id: 's1', name: 'Order-Service', type: 'service', parent: 'p1' },
+  { id: 's2', name: 'Payment-Service', type: 'service', parent: 'p1' },
+  { id: 'd1', name: 'Docker-App-01', type: 'deploy', parent: 'p2' },
+  { id: 'n1', name: 'VLAN-Net-X', type: 'network', parent: 'p3' },
+]);
+
+const rawLinks = [
+  { source: 'p1', target: 's1', type: 'service' },
+  { source: 'p1', target: 's2', type: 'service' },
+  { source: 'p2', target: 'd1', type: 'deploy' },
+  { source: 'p3', target: 'n1', type: 'network' },
+  { source: 's1', target: 'p2', type: 'service' }
+];
 
 // --- 计算属性 ---
 const totalNodeCount = computed(() => rawNodes.value.length);
@@ -213,46 +173,83 @@ const getNodeDependencies = (nodeId) => rawLinks.filter(l => l.target === nodeId
 const getDependentNodes = (nodeId) => rawLinks.filter(l => l.source === nodeId).map(l => l.target);
 const getTypeName = (t) => NODE_TYPES[t]?.name || '未知';
 
-// --- 渲染逻辑 ---
-const render = () => {
+// --- 核心突破：直接从 ECharts 底层引擎获取拖拽后的最新物理坐标 ---
+const syncPositionsFromEcharts = () => {
+  if (!myChart) return;
+  try {
+    const seriesModel = myChart.getModel().getSeriesByIndex(0);
+    if (!seriesModel) return;
+    const data = seriesModel.getData();
+    
+    // 遍历当前图表上已经渲染的节点，抓取真实坐标
+    data.each((dataIndex) => {
+      const rawItem = data.getRawDataItem(dataIndex);
+      const layout = data.getItemLayout(dataIndex); // 隐藏API：获取节点当前的 [x, y] 逻辑坐标
+      if (rawItem && layout && !isNaN(layout[0])) {
+        const node = rawNodes.value.find(n => n.id === rawItem.id);
+        if (node) {
+          node.absX = layout[0];
+          node.absY = layout[1];
+          node._init = true; // 标记此节点已被赋予绝对坐标，不可再被重置
+        }
+      }
+    });
+  } catch (e) {
+    console.warn("坐标同步失败", e);
+  }
+};
+
+// --- 差分更新图表（绝对静默，不重绘整个组件） ---
+const updateGraph = () => {
   if (!myChart) return;
 
-  console.log('开始渲染，当前节点数:', rawNodes.value.length);
-  console.log('expandedNodes:', Array.from(expandedNodes.value));
+  // 1. 在变动画布前，先从图表内部“抓取”所有拖拽后的真实位置存入 rawNodes
+  syncPositionsFromEcharts();
 
   const width = chartRef.value.clientWidth || 800;
   const height = chartRef.value.clientHeight || 600;
 
-  // 1. 过滤需要展示的节点
-  // 物理机节点始终显示，其他节点需要在 expandedNodes 中
+  // 2. 过滤需要展示的节点
   let displayNodes = rawNodes.value.filter(n => {
-    if (n.type === 'pm') {
-      return true; // 物理机始终显示
-    }
-    if (!activeChains.value.includes(n.type)) {
-      return false;
-    }
-    // 其他类型节点的处理逻辑
-    return true; // 暂时都显示
+    if (n.type === 'pm') return true;
+    if (!activeChains.value.includes(n.type)) return false;
+    if (!expandedNodes.value.has(n.parent)) return false;
+    return true;
   });
 
-  console.log('过滤后的节点:', displayNodes);
-
-  // 2. 搜索过滤
   if (searchKey.value) {
     const key = searchKey.value.toLowerCase();
     displayNodes = displayNodes.filter(n => n.name.toLowerCase().includes(key));
   }
 
-  // 3. 计算节点坐标
+  // 3. 将节点分配为 ECharts 需要的格式
   const finalNodes = displayNodes.map(n => {
-    console.log('渲染节点:', n.id, n.name, '坐标:', n.x, n.y);
+    // 【核心】如果节点还没有计算过绝对坐标，则进行计算分配
+    if (!n._init) {
+      if (n.type === 'pm') {
+        // 物理机初始位置
+        n.absX = (n.x / 100) * width;
+        n.absY = (n.y / 100) * height;
+      } else {
+        // 子节点在首次展开时，随机散布在父节点周围
+        const parent = rawNodes.value.find(p => p.id === n.parent);
+        if (parent && parent._init) {
+          n.absX = parent.absX + (Math.random() - 0.5) * 120;
+          n.absY = parent.absY + 80;
+        } else {
+          n.absX = width / 2;
+          n.absY = height / 2;
+        }
+      }
+      n._init = true;
+    }
+
     return {
       id: n.id,
       name: n.name,
       type: n.type,
-      x: n.x,
-      y: n.y,
+      x: n.absX,  // 强制使用计算过或拖拽后的绝对坐标
+      y: n.absY,
       symbolSize: n.type === 'pm' ? 60 : 45,
       symbol: NODE_TYPES[n.type]?.symbol || 'circle',
       itemStyle: {
@@ -265,71 +262,26 @@ const render = () => {
     };
   });
 
-  console.log('最终节点:', finalNodes);
-
   const nodeIds = new Set(finalNodes.map(n => n.id));
-  const finalLinks = (rawLinks.value || []).filter(l => 
+  const finalLinks = rawLinks.filter(l => 
     nodeIds.has(l.source) && 
     nodeIds.has(l.target) && 
     activeChains.value.includes(l.type)
   );
 
-  console.log('最终链接:', finalLinks);
-
-  const option = {
-    backgroundColor: 'transparent',
-    tooltip: {
-      show: true,
-      trigger: 'item',
-      backgroundColor: 'rgba(10,25,50,0.8)',
-      borderColor: '#00f5ff',
-      textStyle: { color: '#fff' },
-      formatter: (params) => {
-        if (params.dataType !== 'node') return '';
-        const node = params.data;
-        return `<div style="color:#fff">
-          <strong>${node.name}</strong><br/>
-          类型: ${getTypeName(node.type)}<br/>
-          ID: ${node.id}
-        </div>`;
-      }
-    },
+  // 4. 【核心】只传入需要更新的 series 数据
+  // 此时 ECharts 会利用默认的 Merge 机制，自动对节点进行差分过渡动画，绝不会重置视角的平移和缩放
+  myChart.setOption({
     series: [{
-      type: 'graph',
-      layout: 'none',
       data: finalNodes,
-      links: finalLinks,
-      roam: true,
-      draggable: true,
-      edgeSymbol: ['none', 'arrow'],
-      edgeSymbolSize: [0, 10],
-      label: { show: true, position: 'bottom', color: '#fff', fontSize: 12 },
-      lineStyle: { width: 3, color: 'rgba(255,255,255,0.3)', curveness: 0.15 },
-      emphasis: {
-        focus: 'adjacency',
-        lineStyle: { width: 5, color: '#00f5ff' }
-      }
+      links: finalLinks
     }]
-  };
-
-  console.log('ECharts option:', option);
-  myChart.setOption(option);
-  console.log('渲染完成');
-  
-  // 测试：检查图表是否渲染成功
-  const optionAfterSet = myChart.getOption();
-  console.log('图表当前配置:', optionAfterSet);
-  console.log('图表系列数据:', optionAfterSet.series?.[0]?.data);
+  });
 };
 
 // --- 初始化与交互 ---
 const initChart = () => {
-  console.log('开始初始化 ECharts');
   myChart = echarts.init(chartRef.value, null, { devicePixelRatio: 2 });
-  console.log('ECharts 实例:', myChart);
-  
-  // 加载物理机数据
-  loadPhysicalMachines();
   
   // 仅在初始化时设定一次全局样式（ToolTip、漫游、全局设定等）
   myChart.setOption({
@@ -365,7 +317,11 @@ const initChart = () => {
     }]
   });
 
-  // 监听点击事件
+  // 开始填充数据并渲染
+  updateGraph();
+  loading.value = false; // 移除全局首次加载遮罩
+
+  // 监听点击事件，只处理展开/收缩，局部无刷新
   myChart.on('click', (params) => {
     if (params.dataType === 'node') {
       const nodeData = params.data;
@@ -379,31 +335,22 @@ const initChart = () => {
         } else {
           expandedNodes.value.add(nodeData.id);
         }
-        // 调用渲染函数
-        render(); 
-      }
-    }
-  });
-
-  // 监听鼠标释放，保存拖拽后的位置
-  myChart.on('mouseup', (params) => {
-    if (params.dataType === 'node' && params.data.type === 'pm') {
-      const nodeData = params.data;
-      const node = rawNodes.value.find(n => n.id === nodeData.id);
-      if (node && nodeData.x !== undefined && nodeData.y !== undefined) {
-        node.x = nodeData.x;
-        node.y = nodeData.y;
+        // 调用局部更新函数，此时你的位置将纹丝不动，只会以动画形式长出/收回新节点
+        updateGraph(); 
       }
     }
   });
 };
 
-const handleSearch = () => render();
+const handleSearch = () => updateGraph();
 
 const resetView = () => {
   expandedNodes.value.clear();
   searchKey.value = '';
-  render();
+  // 强制还原物理机的初始百分比位置，并重置视图缩放
+  rawNodes.value.forEach(n => n._init = false); 
+  myChart.dispatchAction({ type: 'restore' });
+  updateGraph();
 };
 
 const mockAddNode = () => ElMessage.success('正在接入新的物理资源...');
@@ -415,14 +362,8 @@ onMounted(() => {
   });
   window.addEventListener('resize', () => {
     myChart?.resize();
-    render();
+    updateGraph();
   });
-});
-
-// 全局错误监听
-onErrorCaptured((error, instance, info) => {
-  console.error('组件错误捕获:', error, info);
-  return false;
 });
 
 onUnmounted(() => {

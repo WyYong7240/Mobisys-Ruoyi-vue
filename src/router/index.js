@@ -83,6 +83,19 @@ export const constantRoutes = [
         meta: { title: '个人中心', icon: 'user' }
       }
     ]
+  },
+  {
+    path: '/monitor',
+    component: Layout,
+    hidden: true,
+    children: [
+      {
+        path: 'kubernetes/pod-detail',
+        component: () => import('@/views/monitor/kubernetes/pod/podDetail'),
+        name: 'PodDetail',
+        meta: { title: 'Pod 详情监控', activeMenu: '/monitor/kubernetes' }
+      }
+    ]
   }
 ]
 
@@ -155,6 +168,19 @@ export const dynamicRoutes = [
         component: () => import('@/views/tool/gen/editTable'),
         name: 'GenEdit',
         meta: { title: '修改生成配置', activeMenu: '/tool/gen' }
+      }
+    ]
+  },
+  {
+    path: '/notification-rule',
+    component: Layout,
+    hidden: true,
+    children: [
+      {
+        path: 'index',
+        component: () => import('@/views/monitor/notification-rule/index.vue'),
+        name: 'NotificationRuleAdd',
+        meta: { title: '新增通知规则', activeMenu: '/monitor/alert-rule' }
       }
     ]
   }

@@ -69,12 +69,48 @@ export function createSubscribe(data) {
   }
   
   // ===== 通知渠道 =====
-  export function listNotifyChannels() {
-    return request({ url: `${BASE}/notify-channels`, method: 'get' })
+
+  export function listMessageTemplates(params) {
+    return request({ url: `${BASE}/message-templates`, method: 'get', params })
   }
-  export function listNotifyTpls() {
-    return request({ url: `${BASE}/notify-tpls`, method: 'get' })
+
+  export function listNotifyTpls(params) {
+    return request({ url: `${BASE}/notify-tpls`, method: 'get', params })
   }
   export function updateNotifyTpl(data) {
     return request({ url: `${BASE}/notify-tpls`, method: 'put', data })
   }
+
+  export function getAlertRuleOptions(params) {
+    return request({ url: `${BASE}/alert-rules/options`, method: 'get', params })
+  }
+
+  export function listNotifyChannels(params) {
+    return request({ url: `${BASE}/notify-channels`, method: 'get', params })
+  }
+  export function createNotifyChannel(data) {
+    return request({ url: `${BASE}/notify-channels`, method: 'post', data })
+  }
+  export function updateNotifyChannel(data) {
+    return request({ url: `${BASE}/notify-channels`, method: 'put', data })
+  }
+  export function deleteNotifyChannels(ids) {
+    return request({ url: `${BASE}/notify-channels`, method: 'delete', data: { ids } })
+  }
+
+  // ===== 通知规则（notify-rules） =====
+export function listNotifyRules(params) {
+  return request({ url: `${BASE}/notify-rules`, method: 'get', params })
+}
+export function listSimplifiedNotifyChannelConfigs() {
+  return request({ url: `${BASE}/simplified-notify-channel-configs`, method: 'get' })
+}
+export function createNotifyRule(data) {
+  return request({ url: `${BASE}/notify-rules`, method: 'post', data })
+}
+export function updateNotifyRule(id, data) {
+  return request({ url: `${BASE}/notify-rule/${id}`, method: 'put', data })
+}
+export function deleteNotifyRules(ids) {
+  return request({ url: `${BASE}/notify-rules`, method: 'delete', data: { ids } })
+}

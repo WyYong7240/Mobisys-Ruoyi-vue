@@ -78,6 +78,8 @@ export function updatePanelConfig(data) {
   })
 }
 
+
+
 /**
  * 删除面板配置（支持批量，ids 用逗号分隔）
  */
@@ -86,4 +88,22 @@ export function delPanelConfig(ids) {
     url: '/monitor/panel/' + ids,
     method: 'delete'
   })
+}
+
+// 获取微服务 Service 列表
+export function listMicroserviceServices(namespace) {
+  return request({
+    url: '/monitor/panel/microservice/services',
+    method: 'get',
+    params: { namespace }
+  });
+}
+
+// 保存微服务 Service 列表
+export function saveMicroserviceServices(namespace, services) {
+  return request({
+    url: '/monitor/panel/microservice/services',
+    method: 'post',
+    data: { namespace, services }
+  });
 }

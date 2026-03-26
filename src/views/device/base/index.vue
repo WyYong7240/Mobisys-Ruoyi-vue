@@ -152,7 +152,7 @@
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="网卡MAC地址" align="center" prop="macAddress" />
+          <!-- <el-table-column label="网卡MAC地址" align="center" prop="macAddress" /> -->
           <el-table-column label="ip地址" align="center" prop="ipAddress" />
           <el-table-column label="负责人" align="center" prop="leader" />
           <el-table-column label="用户名" align="center" prop="username" />

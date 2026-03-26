@@ -95,6 +95,7 @@
             </template>
           </el-table-column>
           <el-table-column label="应用名称" align="center" prop="appName" min-width="140" show-overflow-tooltip />
+          <el-table-column label="中文名称" align="center" prop="appNameCn" min-width="120" show-overflow-tooltip />
           <el-table-column label="应用分类" align="center" prop="category" width="100">
             <template #default="scope">
               <el-tag type="info" size="small">{{ scope.row.category || 'default' }}</el-tag>
@@ -137,7 +138,7 @@
             <el-row>
               <el-col :span="12">
                 <el-form-item label="所属设备" prop="deviceId">
-                  <el-select v-model="form.deviceId" placeholder="请选择具体机器" style="width: 100%" clearable filterable>
+                  <el-select v-model="form.deviceId" placeholder="请选择具体机器" style="width: 100%" clearable filterable @change="handleDeviceSelect">
                     <el-option-group
                       v-for="group in deviceGroupOptions"
                       :key="group.label"
@@ -171,6 +172,13 @@
               <el-col :span="12">
                 <el-form-item label="应用分类" prop="category">
                   <el-input v-model="form.category" placeholder="如: web, scheduler" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+            <el-row>
+              <el-col :span="12">
+                <el-form-item label="中文名称" prop="appNameCn">
+                  <el-input v-model="form.appNameCn" placeholder="请输入应用中文名称" />
                 </el-form-item>
               </el-col>
             </el-row>
@@ -339,7 +347,7 @@ export default {
                     deviceId: m.physicalId,
                     deviceName: categoryName + ' / ' + m.physicalName
                   })
-                  return { physicalId: m.physicalId, physicalName: m.physicalName }
+                  return { physicalId: m.physicalId, physicalName: m.physicalName, ipAddress: m.ipAddress }
                 })
               }
               this.deviceGroupOptions.push(group)
@@ -392,6 +400,7 @@ export default {
         jarsId: null,
         deviceId: null,   // 直接存 physicalId
         appName: null,
+        appNameCn: null,
         category: 'default',
         status: 0,
         ipAddress: null,
@@ -405,6 +414,17 @@ export default {
         remark: null
       }
       this.resetForm("jarsRef")
+    },
+
+    handleDeviceSelect(physicalId) {
+      // 选择设备时自动填充 IP 地址
+      for (const group of this.deviceGroupOptions) {
+        const found = group.options.find(m => m.physicalId === physicalId)
+        if (found && found.ipAddress) {
+          this.form.ipAddress = found.ipAddress
+          break
+        }
+      }
     },
 
     handleQuery() {

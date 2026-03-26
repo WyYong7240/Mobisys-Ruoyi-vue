@@ -55,3 +55,48 @@ export function delJarsPanelConfig(ids) {
     method: 'delete'
   })
 }
+
+/**
+ * 批量更新面板排序和宽度
+ * @param {Array} list - [{ id, sortOrder, groupSortOrder, panelSpan }, ...]
+ */
+export function batchSortJarsPanels(list) {
+  return request({
+    url: '/monitor/jars/panel/batchSort',
+    method: 'put',
+    data: list
+  })
+}
+
+/**
+ * 调用追踪查询
+ * @param {Object} query - { service, endpoint, startTime, endTime, limit }
+ */
+export function queryJarsTrace(query) {
+  return request({
+    url: '/monitor/jars/trace/query',
+    method: 'get',
+    params: query
+  })
+}
+
+/**
+ * 获取 Jaeger 配置
+ */
+export function getJarsTraceConfig() {
+  return request({
+    url: '/monitor/jars/trace/config',
+    method: 'get'
+  })
+}
+
+/**
+ * 更新 Jaeger 配置
+ */
+export function updateJarsTraceConfig(data) {
+  return request({
+    url: '/monitor/jars/trace/config',
+    method: 'post',
+    data
+  })
+}

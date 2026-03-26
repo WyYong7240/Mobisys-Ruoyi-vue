@@ -149,11 +149,10 @@ export const realtimeStatus = ref('未知')
 export const serverInfo = ref({}) 
 export const hardwareDetail = ref({ cpu: { model: '-', vendor: '-', arch: '-', cores: 0, threads: 0, freq: '-' }, memory: { slots: [], totalSlots: 0 } });
 export const metrics = ref({ cpuUsage: 0, cpuFree: 100, memTotalGb: 0, memUsage: 0, memUsedGb: 0, memFreeGb: 0 })
-
-export const grafanaBaseUrl = "http://192.168.31.34:32556/d-solo/bc847f0f-175a-47d4-8808-958da9b029f3/node-resources-board"
+export const grafanaBaseUrl = "http://192.168.31.34:32556/d-solo/ba649937-c032-4ca1-b39d-6b3a1b505fd9/noderesource-copy"
 export const panelList = ref([
   {id: 1, name: "CPU利用率", desc: "反映节点整体计算资源的紧张程度。"},
-  {id: 2, name: "内存利用率", desc: "反映节点物理内存的使用比例。"},
+  {id: 6, name: "内存利用率", desc: "反映节点物理内存的使用比例。"},
   {id: 3, name: "网络接收速率", desc: "节点网卡每秒接收的数据量（入站流量）。"},
   {id: 4, name: "网络发送速率", desc: "节点网卡每秒发送的数据量（出站流量）。"},
   {id: 5, name: "磁盘利用率", desc: "存储空间的使用比例。"}

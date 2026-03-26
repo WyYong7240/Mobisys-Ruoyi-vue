@@ -8,6 +8,7 @@
           <el-button size="small" :type="panelCols === 4 ? 'primary' : ''" @click="panelCols = 4">4列</el-button>
         </el-button-group>
         <el-button size="small" @click="openNsManagerDialog">管理微服务命名空间</el-button>
+        <el-button size="small" @click="openServiceManagerDialog">管理微服务Service</el-button>
       </div>
     </div>
 
@@ -221,11 +222,47 @@
         <el-button type="primary" @click="saveMetric">保存</el-button>
       </template>
     </el-dialog>
+
+    <!-- 管理微服务 Service 对话框 -->
+    <el-dialog title="管理微服务Service" v-model="serviceManagerVisible" width="700px" @open="onServiceManagerOpen">
+      <div class="service-manager">
+        <div class="service-manager__desc">从当前命名空间所有 Service 中，选择属于微服务的 Service。</div>
+        <el-row :gutter="16" style="margin-top:16px;">
+          <el-col :span="11">
+            <div class="ns-panel-title">所有 Service<span class="ns-panel-count">({{ allServicesFiltered.length }})</span></div>
+            <div class="ns-search"><el-input v-model="serviceSearchAll" size="small" placeholder="搜索..." clearable /></div>
+            <div class="ns-list">
+              <div v-for="svc in allServicesFiltered" :key="svc" class="ns-item" :class="{'is-selected': tempMicroserviceServices.includes(svc)}" @click="toggleServiceSelection(svc)">
+                <span v-if="tempMicroserviceServices.includes(svc)">✓</span><span v-else>+</span>&nbsp;{{ svc }}
+              </div>
+              <div v-if="allServicesFiltered.length === 0" class="ns-empty">暂无数据</div>
+            </div>
+          </el-col>
+          <el-col :span="2" class="ns-arrow-col">→</el-col>
+          <el-col :span="11">
+            <div class="ns-panel-title">已选微服务 Service<span class="ns-panel-count">({{ tempMicroserviceServices.length }})</span></div>
+            <div class="ns-search"><el-input v-model="serviceSearchSelected" size="small" placeholder="搜索已选..." clearable /></div>
+            <div class="ns-list">
+              <div v-for="svc in tempMicroserviceServicesFiltered" :key="svc" class="ns-item ns-item--selected">
+                {{ svc }}<span class="ns-item__remove" @click="removeServiceSelection(svc)">✕</span>
+              </div>
+              <div v-if="tempMicroserviceServicesFiltered.length === 0" class="ns-empty">未选择任何 Service</div>
+            </div>
+          </el-col>
+        </el-row>
+      </div>
+      <template #footer>
+        <el-button @click="serviceManagerVisible = false">取消</el-button>
+        <el-button type="primary" @click="saveMicroserviceServices" :loading="serviceSaving">保存</el-button>
+      </template>
+    </el-dialog>
+
   </div>
 </template>
 <script>
 import axios from 'axios';
 import { listPanelConfig, savePanelConfig, delPanelConfig, listMicroserviceNamespaces, saveMicroserviceNamespaces } from '@/api/monitor/microservice';
+import { listMicroserviceServices, saveMicroserviceServices as saveMicroserviceServicesApi } from '@/api/monitor/microservice';
 
 export default {
   name: 'MicroServiceMonitor',
@@ -258,7 +295,16 @@ export default {
       jaegerBaseUrl: 'http://192.168.31.34:32686',
       jaegerService: '',
       jaegerView: 'search',
-      jaegerSrc: ''
+      jaegerSrc: '',
+      podFilterVisible: false,
+      selectedNamespaceForPodFilter: '',
+      allServices: [],  // 当前命名空间的所有 Service
+      microserviceServices: {},  // 格式: { namespace: ['service1', 'service2'] }
+      tempMicroserviceServices: [],  // 临时选择的微服务 Service
+      serviceSearchAll: '',
+      serviceSearchSelected: '',
+      serviceSaving: false,
+      serviceManagerVisible: false,
     };
   },
   computed: {
@@ -271,6 +317,14 @@ export default {
     tempMicroserviceNamespacesFiltered() {
       const q = this.nsSearchSelected.toLowerCase();
       return q ? this.tempMicroserviceNamespaces.filter(n => n.toLowerCase().includes(q)) : this.tempMicroserviceNamespaces;
+    },
+    allServicesFiltered() {
+      const q = this.serviceSearchAll.toLowerCase();
+      return q ? this.allServices.filter(s => s.toLowerCase().includes(q)) : this.allServices;
+    },
+    tempMicroserviceServicesFiltered() {
+      const q = this.serviceSearchSelected.toLowerCase();
+      return q ? this.tempMicroserviceServices.filter(s => s.toLowerCase().includes(q)) : this.tempMicroserviceServices;
     }
   },
   created() { this.init(); },
@@ -281,12 +335,39 @@ export default {
         if (this.microserviceNamespaces.length > 0) {
           if (!this.microserviceNamespaces.includes(this.queryParams.namespace))
             this.queryParams.namespace = this.microserviceNamespaces[0];
-          this.fetchServices(); // fetchServices -> fetchPods -> syncJaegerService 会自动刷新
+          // 加载该命名空间的微服务 Service
+          await this.loadMicroserviceServices(this.queryParams.namespace);
+          this.fetchServices();
         } else {
-          // 没有配置命名空间时直接显示 Jaeger
           this.refreshJaeger();
         }
       } catch (e) { console.error('初始化失败', e); }
+    },
+    async loadMicroserviceServices(namespace) {
+      try {
+        const res = await listMicroserviceServices(namespace);
+        if (res.code === 200 && Array.isArray(res.data)) {
+          this.microserviceServices[namespace] = res.data;
+        }
+      } catch (e) { console.error('加载微服务 Service 失败', e); }
+    },
+    async handleNamespaceChange() {
+      await this.loadMicroserviceServices(this.queryParams.namespace);
+      this.fetchServices();
+    },
+    async saveMicroserviceServices() {
+      this.serviceSaving = true;
+      try {
+        const ns = this.queryParams.namespace;
+        await saveMicroserviceServicesApi(ns, this.tempMicroserviceServices);
+        this.microserviceServices[ns] = [...this.tempMicroserviceServices];
+        this.serviceManagerVisible = false;
+        this.$message.success('微服务 Service 已保存');
+      } catch (e) {
+        this.$message.error('保存失败');
+      } finally {
+        this.serviceSaving = false;
+      }
     },
     async fetchAllNamespaces() {
       try {
@@ -332,7 +413,10 @@ export default {
         const url = `/api/datasources/proxy/1/api/v1/label/container/values?match[]=container_memory_working_set_bytes{namespace="${ns}",container!="",container!="POD"}`;
         const res = await axios.get(url);
         if (res.data.status === 'success') {
-          this.serviceOptions = res.data.data;
+          const allSvcs = res.data.data;
+          const microSvcs = this.microserviceServices[ns] || [];
+          // 若已配置微服务 Service，则只显示已选的；否则显示全部
+          this.serviceOptions = microSvcs.length > 0 ? allSvcs.filter(s => microSvcs.includes(s)) : allSvcs;
           if (this.serviceOptions.length > 0 && !this.serviceOptions.includes(this.queryParams.service))
             this.queryParams.service = this.serviceOptions[0];
           this.fetchPods();
@@ -353,7 +437,10 @@ export default {
       await this.loadSavedConfig();
       this.syncJaegerService(); // 同步 Jaeger focal service 并刷新 iframe
     },
-    handleNamespaceChange() { this.fetchServices(); },
+    async handleNamespaceChange() {
+      await this.loadMicroserviceServices(this.queryParams.namespace);
+      this.fetchServices();
+    },
     handleServiceChange()   { this.fetchPods(); this.syncJaegerService(); },
     async handleFilterChange() { await this.loadSavedConfig(); },
     refreshData() { this.init(); this.$message.success('数据已更新'); },
@@ -412,6 +499,54 @@ export default {
         this.$message.success('指标已删除');
       }).catch(() => {});
     },
+    // ===== Service Manager =====
+    openServiceManagerDialog() {
+      this.serviceManagerVisible = true;
+    },
+    onServiceManagerOpen() {
+      this.serviceSearchAll = '';
+      this.serviceSearchSelected = '';
+      const ns = this.queryParams.namespace;
+      this.tempMicroserviceServices = [...(this.microserviceServices[ns] || [])];
+      this.fetchAllServicesInNamespace();
+    },
+    async fetchAllServicesInNamespace() {
+      try {
+        const ns = this.queryParams.namespace;
+        if (!ns) { this.$message.warning('请先选择命名空间'); return; }
+        const url = `/api/datasources/proxy/1/api/v1/label/container/values?match[]=container_memory_working_set_bytes{namespace="${ns}",container!="",container!="POD"}`;
+        const res = await axios.get(url);
+        if (res.data.status === 'success') this.allServices = res.data.data || [];
+      } catch (e) { console.error('获取 Service 列表失败', e); }
+    },
+    toggleServiceSelection(svc) {
+      const idx = this.tempMicroserviceServices.indexOf(svc);
+      if (idx === -1) this.tempMicroserviceServices.push(svc);
+      else this.tempMicroserviceServices.splice(idx, 1);
+    },
+    removeServiceSelection(svc) {
+      this.tempMicroserviceServices = this.tempMicroserviceServices.filter(s => s !== svc);
+    },
+    async saveMicroserviceServices() {
+      this.serviceSaving = true;
+      try {
+        const ns = this.queryParams.namespace;
+        await saveMicroserviceServices(ns, this.tempMicroserviceServices);
+        this.$set(this.microserviceServices, ns, [...this.tempMicroserviceServices]);
+        // 保存后重新刷新 service 下拉列表
+        await this.fetchServices();
+        this.serviceManagerVisible = false;
+        this.$message.success('微服务 Service 已保存');
+      } catch (e) { this.$message.error('保存失败'); } finally { this.serviceSaving = false; }
+    },
+    async loadMicroserviceServices(namespace) {
+      try {
+        const res = await listMicroserviceServices(namespace);
+        if (res.code === 200 && Array.isArray(res.data))
+          this.$set(this.microserviceServices, namespace, res.data);
+      } catch (e) { console.error('加载微服务 Service 失败', e); }
+    },
+
     // ===== Jaeger =====
     syncJaegerService() {
       // 上方 SERVICE 下拉联动：同步服务并刷新 iframe
@@ -448,7 +583,8 @@ export default {
     // ===== /Jaeger =====
     async loadSavedConfig() {
       const { namespace: ns, service: svc, pod } = this.queryParams;
-      if (!ns || !svc) return;
+
+      // 重置面板
       this.customMetrics = [];
       this.defaultPanels = [
         { id: 'default_1', grafanaPanelId: 1, name: 'CPU 使用率',  isCustom: false, timeRange: '5m', refreshInterval: '30s' },
@@ -457,14 +593,54 @@ export default {
         { id: 'default_4', grafanaPanelId: 4, name: '网络发送',    isCustom: false, timeRange: '5m', refreshInterval: '30s' },
         { id: 'default_3', grafanaPanelId: 3, name: '磁盘 I/O',    isCustom: false, timeRange: '5m', refreshInterval: '30s' }
       ];
+
+      if (!ns || !svc) return;
+
       try {
-        const [r1, r2, r3] = await Promise.all([listPanelConfig({namespace:ns,service:svc,pod}), listPanelConfig({namespace:ns,service:svc,pod:'All'}), listPanelConfig({namespace:ns,service:'All',pod:'All'})]);
+        const [r1, r2, r3] = await Promise.all([
+          listPanelConfig({namespace:ns,service:svc,pod}), 
+          listPanelConfig({namespace:ns,service:svc,pod:'All'}), 
+          listPanelConfig({namespace:ns,service:'All',pod:'All'})
+        ]);
         const seen = new Set(), all = [];
-        for (const r of [r1,r2,r3]) { if (r.code===200 && Array.isArray(r.data)) r.data.forEach(p => { if (!seen.has(p.panelKey)) { seen.add(p.panelKey); all.push(p); } }); }
-        all.filter(p => p.isCustom===0).forEach(d => { const i = this.defaultPanels.findIndex(p => p.id===d.panelKey); if (i!==-1) this.$set(this.defaultPanels, i, { ...this.defaultPanels[i], name:d.panelName, grafanaPanelId:d.grafanaPanelId, timeRange:d.timeRange, refreshInterval:d.refreshInterval, dbId:d.id }); });
-        this.customMetrics = all.filter(p => p.isCustom===1).map(d => ({ id:d.panelKey, dbId:d.id, name:d.panelName, isCustom:true, grafanaPanelId:d.grafanaPanelId, promql:d.promql, chartType:d.chartType, unit:d.unit, timeRange:d.timeRange, refreshInterval:d.refreshInterval, sortOrder:d.sortOrder, scope:d.remark||'pod' }));
-      } catch (e) { console.error('加载面板配置失败', e); }
+        for (const r of [r1,r2,r3]) { 
+          if (r.code===200 && Array.isArray(r.data)) 
+            r.data.forEach(p => { 
+              if (!seen.has(p.panelKey)) { 
+                seen.add(p.panelKey); 
+                all.push(p); 
+              } 
+            }); 
+        }
+        all.filter(p => p.isCustom===0).forEach(d => { 
+          const i = this.defaultPanels.findIndex(p => p.id===d.panelKey); 
+          if (i!==-1) this.$set(this.defaultPanels, i, { ...this.defaultPanels[i], name:d.panelName, grafanaPanelId:d.grafanaPanelId, timeRange:d.timeRange, refreshInterval:d.refreshInterval, dbId:d.id }); 
+        });
+        this.customMetrics = all.filter(p => p.isCustom===1).map(d => ({ 
+          id:d.panelKey, 
+          dbId:d.id, 
+          name:d.panelName, 
+          isCustom:true, 
+          grafanaPanelId:d.grafanaPanelId, 
+          promql:d.promql, 
+          chartType:d.chartType, 
+          unit:d.unit, 
+          timeRange:d.timeRange, 
+          refreshInterval:d.refreshInterval, 
+          sortOrder:d.sortOrder, 
+          scope:d.remark||'pod' 
+        }));
+      } catch (e) { 
+        console.error('加载面板配置失败', e); 
+      }
+    },
+    selectPod(pod) {
+      this.queryParams.pod = pod;
+      this.podFilterVisible = false;
+      this.loadSavedConfig();
+      this.$message.success(`已选择 Pod: ${pod}`);
     }
+
   }
 };
 </script>
@@ -494,6 +670,11 @@ export default {
 .ns-item__remove:hover { color:#f56c6c; }
 .ns-empty { text-align:center; color:#c0c4cc; font-size:13px; padding:20px 0; }
 .ns-arrow-col { display:flex; align-items:center; justify-content:center; font-size:20px; color:#c0c4cc; padding-top:60px; }
+.pod-filter { padding: 0; }
+.pod-list { max-height: 400px; overflow-y: auto; border: 1px solid #ebeef5; border-radius: 4px; }
+.pod-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
+.pod-item:last-child { border-bottom: none; }
+.pod-item:hover { background: #f5f7fa; }
 
 /* ===== Jaeger ===== */
 .jaeger-header { display:flex; justify-content:space-between; align-items:center; }
