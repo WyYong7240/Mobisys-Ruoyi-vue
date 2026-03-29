@@ -152,7 +152,7 @@
               </el-tag>
             </template>
           </el-table-column>
-          <!-- <el-table-column label="网卡MAC地址" align="center" prop="macAddress" /> -->
+          <el-table-column label="网卡MAC地址" align="center" prop="macAddress" />
           <el-table-column label="ip地址" align="center" prop="ipAddress" />
           <el-table-column label="负责人" align="center" prop="leader" />
           <el-table-column label="用户名" align="center" prop="username" />
@@ -517,7 +517,7 @@ buildTree(data, parentId) {
       console.log('新增按钮被点击')
       this.reset()
       this.open = true
-      this.title = "添加【请填写功能名称】"
+      this.title = "添加物理机设备"
     },
     
     /** 获取设备类型名称 */
@@ -536,7 +536,7 @@ buildTree(data, parentId) {
           this.form.checkPassword = this.form.password
         }
         this.open = true
-        this.title = "修改【请填写功能名称】"
+        this.title = "修改物理机设备"
       })
     },
     /** 提交按钮 */
@@ -562,7 +562,8 @@ buildTree(data, parentId) {
     /** 删除按钮操作 */
     handleDelete(row) {
       const physicalIds = row.physicalId || this.ids
-      this.$modal.confirm('是否确认删除【请填写功能名称】编号为"' + physicalIds + '"的数据项？').then(function() {
+      const physicalNames = row.physicalName || this.masterList.filter(item => physicalIds.includes(item.physicalId)).map(item => item.physicalName).join(', ')
+      this.$modal.confirm('是否确认删除物理机"' + physicalNames + '"？').then(function() {
         return delMaster(physicalIds)
       }).then(() => {
         this.getList()

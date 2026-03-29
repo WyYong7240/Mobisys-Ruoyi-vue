@@ -361,7 +361,7 @@ function handleNodeClick(data) {
   dbInfo.name = data.label
   dbInfo.ip = data.ip
   dbInfo.port = data.port
-  dbInfo.version = data.version
+  dbInfo.version = "5.7"
   dbInfo.user = data.user
   dbInfo.job = data.job
   dbInfo.status = data.status

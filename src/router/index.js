@@ -94,6 +94,20 @@ export const constantRoutes = [
         component: () => import('@/views/monitor/kubernetes/pod/podDetail'),
         name: 'PodDetail',
         meta: { title: 'Pod 详情监控', activeMenu: '/monitor/kubernetes' }
+      },
+      // 【新增这一块】：注册 Deployment 详情隐藏路由
+      {
+        path: 'kubernetes/deployment-detail',
+        component: () => import('@/views/monitor/kubernetes/deploy/deployDetail'),
+        name: 'DeploymentDetail',
+        meta: { title: 'Deployment 详情监控', activeMenu: '/monitor/kubernetes/deployment' } // 高亮左侧 Deployment 菜单
+      },
+      // 【新增这一块】：注册 Service 详情隐藏路由
+      {
+        path: 'kubernetes/service-detail',
+        component: () => import('@/views/monitor/kubernetes/service/serviceDetail'),
+        name: 'ServiceDetail',
+        meta: { title: 'Service 详情监控', activeMenu: '/monitor/kubernetes/service' } // 高亮左侧 Service 菜单
       }
     ]
   }
